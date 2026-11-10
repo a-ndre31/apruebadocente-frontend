@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ApruebaDocente · Preparación para el examen docente EVDO 2026-2027</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --p: #4f46e5;
+      --pd: #4338ca;
+      --pl: #eef2ff;
+      --a: #f59e0b;
+      --ad: #d97706;
+      --ok: #10b981;
+      --okd: #047857;
+      --er: #dc2626;
+      --ink: #0f172a;
+      --tx: #334155;
+      --mu: #64748b;
+      --ln: #e2e8f0;
+      --bg: #f8fafc;
+      --w: #fff;
+      --fh: "Plus Jakarta Sans", Inter, system-ui, sans-serif;
+      --radius: 12px;
+      --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: Inter, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--tx);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    h1, h2, h3, h4, .brand { font-family: var(--fh); color: var(--ink); }
+    .pantalla { display: none; min-height: 100vh; }
+    .pantalla.activa { display: block; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+    .lg { width: 32px; height: 32px; flex: none; }
+
+    /* Franja tricolor Ecuador */
+    .franja-ecuador {
+      height: 5px;
+      background: linear-gradient(to right, #FFDD00 0%, #FFDD00 33.33%, #034EA2 33.33%, #034EA2 66.66%, #ED1C24 66.66%, #ED1C24 100%);
+      width: 100%;
+      flex-shrink: 0;
+      display: block;
+    }
+
+    /* Botones Globales */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 10px 18px; border: 0; border-radius: 8px; font: 600 14px Inter, sans-serif;
+      cursor: pointer; transition: all .2s; text-decoration: none;
+    }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+    .btn-primary { background: var(--p); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--pd); transform: translateY(-1px); }
+    .btn-cta { background: var(--a); color: #1c1917; box-shadow: 0 6px 18px rgba(245,158,11,.35); font-weight: 700; }
+    .btn-cta:hover { background: var(--ad); transform: translateY(-2px); }
+    .btn-secondary { background: #e2e8f0; color: var(--tx); }
+    .btn-secondary:hover { background: #cbd5e1; }
+    .btn-outline { background: transparent; color: var(--p); border: 2px solid var(--p); }
+    .btn-outline:hover { background: var(--pl); }
+    .btn-outline-white { background: transparent; color: #fff; border: 2px solid rgba(255,255,255,.4); }
+    .btn-outline-white:hover { background: rgba(255,255,255,.1); border-color: #fff; }
+    .btn-ghost { background: transparent; color: var(--mu); }
+    .btn-ghost:hover { background: #f1f5f9; color: var(--ink); }
+    .btn-success { background: var(--okd); color: #fff; }
+    .btn-success:hover { background: #065f46; }
+    .btn-danger { background: var(--er); color: #fff; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-lg { padding: 14px 26px; font-size: 16px; border-radius: 12px; }
+    .btn-block { width: 100%; }
+
+    /* ===== LANDING PAGE DETALLADA ===== */
+    .ln-nav {
+      position: sticky; top: 0; z-index: 20;
+      background: rgba(11, 16, 32, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid #1e293b;
+    }
+    .ln-nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .brand-logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 18px; color: #fff; text-decoration: none; }
+    .ln-links { display: flex; align-items: center; gap: 24px; font-size: 14px; font-weight: 500; }
+    .ln-links a:not(.btn) { color: #cbd5e1; text-decoration: none; }
+    .ln-links a:not(.btn):hover { color: #fff; }
+
+    .hero {
+      padding: 72px 0 110px;
+      background: radial-gradient(700px 420px at 80% 10%, rgba(99,102,241,.5), transparent 60%),
+                  radial-gradient(500px 300px at 0 100%, rgba(245,158,11,.2), transparent 60%),
+                  #0b1020;
+      color: #fff;
+    }
+    .hero .wrap { display: grid; grid-template-columns: 1.1fr .9fr; gap: 48px; align-items: center; }
+    .conf-badge {
+      display: inline-block; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.2);
+      color: #e0e7ff; font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 12px; margin-bottom: 16px;
+    }
+    .hero h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.15; font-weight: 800; color: #fff; letter-spacing: -.02em; }
+    .hero h1 em { font-style: normal; color: var(--a); }
+    .hero p.sub { font-size: 18px; color: #cbd5e1; margin: 16px 0 24px; max-width: 520px; }
+    .hero .ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+    .hero small { display: block; margin-top: 16px; color: #94a3b8; font-size: 13px; }
+
+    .mock {
+      background: #fff; border-radius: 24px; box-shadow: 0 30px 80px rgba(0,0,0,.55);
+      border: 1px solid var(--ln); padding: 24px; position: relative; color: var(--tx);
+    }
+    .mock .dots { display: flex; gap: 6px; align-items: center; margin-bottom: 16px; }
+    .mock .dots i { width: 10px; height: 10px; border-radius: 50%; background: #e2e8f0; }
+    .mock .dots span { margin-left: auto; font-size: 11px; color: var(--mu); }
+    .mock .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 12px; color: var(--mu); font-weight: 600; }
+    .mock .tm { font-family: monospace; background: var(--pl); color: var(--p); padding: 4px 10px; border-radius: 8px; font-weight: 800; }
+    .mock .q { font: 700 15px var(--fh); color: var(--ink); margin-bottom: 12px; }
+    .mock .o { border: 2px solid var(--ln); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; cursor: pointer; }
+    .mock .o.s { border-color: var(--ok); background: #ecfdf5; color: var(--okd); font-weight: 600; }
+    .mock .o.x { border-color: var(--er); background: #fef2f2; color: #b91c1c; font-weight: 600; }
+    .mock .pg { height: 8px; border-radius: 8px; background: var(--ln); margin-top: 16px; overflow: hidden; }
+    .mock .pg i { display: block; height: 100%; width: 68%; background: linear-gradient(90deg, var(--p), #818cf8); }
+    .mock .chip { position: absolute; right: -10px; bottom: -16px; background: var(--okd); color: #fff; font-size: 12px; font-weight: 700; padding: 8px 14px; border-radius: 20px; box-shadow: 0 4px 14px rgba(0,0,0,.15); }
+
+    .prueba-bar { background: transparent; border: 0; padding: 0 16px; margin-top: -44px; position: relative; z-index: 2; }
+    .prueba-bar .wrap { background: #fff; border-radius: 20px; box-shadow: 0 20px 50px rgba(79,70,229,.18); padding: 24px; display: flex; justify-content: space-around; gap: 24px; flex-wrap: wrap; text-align: center; }
+    .prueba-bar b { display: block; font: 800 30px var(--fh); color: var(--ink); }
+    .prueba-bar span { font-size: 13px; color: var(--mu); }
+
+    .sec { padding: 88px 0; }
+    .sec.alt { background: var(--w); }
+    .sec h2 { font-size: clamp(26px, 3.4vw, 36px); font-weight: 800; text-align: center; letter-spacing: -.01em; }
+    .sec .lead { text-align: center; color: var(--mu); margin: 12px auto 48px; max-width: 560px; }
+
+    .g4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; }
+    .g3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+    .ben { background: var(--w); border: 1px solid var(--ln); border-top: 3px solid var(--p); border-radius: 16px; padding: 24px; box-shadow: var(--shadow); transition: all .25s; }
+    .ben:hover { transform: translateY(-4px); }
+    .cap { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; font-size: 24px; margin-bottom: 16px; }
+    .c-i { background: #e0e7ff; } .c-a { background: #fef3c7; } .c-v { background: #d1fae5; } .c-r { background: #fce7f3; }
+    .ben h3 { font-size: 17px; margin-bottom: 8px; } .ben p { font-size: 14px; color: var(--mu); }
+
+    .paso { text-align: center; padding: 0 12px; }
+    .paso .n { font: 800 72px/1 var(--fh); background: linear-gradient(180deg, var(--p), #c7d2fe); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .paso h3 { margin: 8px 0; } .paso p { font-size: 14px; color: var(--mu); }
+
+    .precios { display: flex; justify-content: center; }
+    .plan { background: #0b1020; color: #cbd5e1; border-radius: 24px; padding: 36px 32px; position: relative; max-width: 420px; width: 100%; box-shadow: 0 20px 50px rgba(79,70,229,.25); text-align: center; }
+    .plan h3 { color: #fff; font-size: 22px; margin-bottom: 8px; }
+    .plan .tag { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); background: var(--a); color: #1c1917; font-size: 12px; font-weight: 700; padding: 4px 16px; border-radius: 20px; }
+    .plan .pr { font: 800 48px var(--fh); color: #fff; margin: 12px 0; } .plan .pr small { font: 500 14px Inter; color: #94a3b8; }
+    .plan ul { list-style: none; margin: 20px 0 28px; text-align: left; } .plan li { padding: 8px 0; font-size: 14px; color: #e2e8f0; } .plan li:before { content: "✓"; color: var(--ok); font-weight: 800; margin-right: 10px; }
+
+    details { background: var(--w); border: 1px solid var(--ln); border-radius: 12px; padding: 16px 24px; margin: 0 auto 12px; max-width: 720px; }
+    summary { font-weight: 600; color: var(--ink); cursor: pointer; } details p { margin-top: 12px; font-size: 14px; color: var(--mu); }
+
+    .fin { background: linear-gradient(135deg, var(--p), #6366f1); color: #fff; text-align: center; padding: 48px 24px; }
+    .fin h2 { color: #fff; margin-bottom: 16px; font-size: clamp(24px, 3vw, 32px); }
+
+    .ft { background: #0f172a; color: #94a3b8; padding: 48px 0 24px; font-size: 14px; }
+    .ft .cols { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 32px; margin-bottom: 32px; }
+    .ft h4 { color: #fff; font-size: 14px; margin-bottom: 12px; } .ft a { display: block; color: #94a3b8; text-decoration: none; padding: 3px 0; } .ft a:hover { color: #fff; }
+    .ft .cp { border-top: 1px solid #1e293b; padding-top: 24px; text-align: center; font-size: 13px; }
+
+    .wa-f { position: fixed; right: 20px; bottom: 20px; z-index: 30; width: 56px; height: 56px; border-radius: 50%; background: #25d366; display: grid; place-items: center; font-size: 28px; text-decoration: none; box-shadow: 0 8px 24px rgba(37,211,102,.45); transition: transform .2s; }
+    .wa-f:hover { transform: scale(1.08); }
+
+    /* ===== LOGIN ===== */
+    #pantalla-login { background: radial-gradient(700px 400px at 10% 0,#c7d2fe,transparent 60%), linear-gradient(135deg,#312e81,#4f46e5); align-items: center; justify-content: center; padding: 24px; }
+    #pantalla-login.activa { display: flex; }
+    .login-container { background: var(--w); border-radius: 24px; box-shadow: 0 30px 80px rgba(0,0,0,.35); padding: 48px 32px; max-width: 420px; width: 100%; text-align: center; }
+    .login-container h1 { font-size: 24px; font-weight: 800; margin-bottom: 6px; }
+    .subtitulo { color: var(--mu); font-size: 14px; margin-bottom: 24px; }
+    .login-form { text-align: left; } .login-form label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+    .login-form input, .login-form select { width: 100%; padding: 13px 14px; border: 2px solid var(--ln); border-radius: 12px; font: 500 15px Inter; margin-bottom: 16px; background: #fff; }
+    .login-form input:focus, .login-form select:focus { border-color: var(--p); outline: none; box-shadow: 0 0 0 4px #e0e7ff; }
+    .alerta-err { color: var(--er); font-size: 13px; margin-top: 10px; text-align: center; }
+
+    /* ===== PANEL DOCENTE ===== */
+    .topbar { background: var(--w); border-bottom: 1px solid var(--ln); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+    .panel-main { max-width: 1000px; margin: 0 auto; padding: 32px 24px; }
+    .info-usuario { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .info-item { background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid var(--ln); }
+    .info-item .label { font-size: 11px; color: var(--mu); text-transform: uppercase; letter-spacing: .03em; }
+    .info-item .valor { font-weight: 700; font-size: 15px; margin-top: 2px; }
+
+    .acciones-examen { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .accion-card { border: 2px solid var(--ln); border-radius: 16px; padding: 20px; text-align: center; background: #fff; transition: all .2s; }
+    .accion-card:hover { border-color: var(--p); box-shadow: 0 4px 14px rgba(79,70,229,.1); }
+
+    /* ===== PANTALLA EXAMEN Y RESULTADOS ===== */
+    .examen-card { background: #fff; border-radius: 16px; border: 1px solid var(--ln); padding: 24px; box-shadow: var(--shadow); margin-bottom: 24px; }
+    .navegador-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+
+    /* ===== PANTALLA ADMINISTRACIÓN REDISEÑADA ===== */
+    #pantalla-admin .wrap { max-width: 1240px; }
+    #pantalla-admin .app-pad { padding: 24px 0; }
+    #pantalla-admin .header-admin {
+      background: #fff; color: var(--ink); border: 1px solid var(--ln);
+      border-radius: 16px; padding: 1.2rem 1.5rem; margin-bottom: 1.35rem;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, .045);
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+    }
+    #pantalla-admin .header-admin h1 { color: #172554; font-size: 1.45rem; letter-spacing: -.025em; }
+    .admin-header-sub { color: #64748b; font-size: .86rem; margin-top: .22rem; }
+    .admin-header-sub span { color: #cbd5e1; padding: 0 .2rem; }
+
+    .admin-layout { display: grid; grid-template-columns: 235px minmax(0, 1fr); gap: 1.15rem; align-items: start; }
+    .admin-tabs {
+      display: flex; flex-direction: column; gap: .38rem; padding: .75rem;
+      background: #fff; border: 1px solid #e7edf5; border-radius: 15px;
+      box-shadow: 0 5px 18px rgba(15,23,42,.035); position: sticky; top: 1rem;
+    }
+    .admin-tab {
+      display: flex; align-items: center; gap: .7rem; width: 100%; text-align: left;
+      padding: .78rem .85rem; border: 1px solid transparent; border-radius: 9px;
+      background: transparent; color: #475569; font-size: .88rem; font-weight: 600; cursor: pointer;
+      transition: background .18s ease, color .18s ease, border-color .18s ease;
+    }
+    .admin-tab:hover { background: #f5f7fb; color: #1e40af; }
+    .admin-tab.activa { background: #eff6ff; color: #1d4ed8; border-color: #dbeafe; box-shadow: inset 3px 0 #2563eb; }
+    .admin-tab .tab-symbol { width: 1.45rem; text-align: center; font-size: 1rem; }
+    
+    .admin-content { min-width: 0; }
+    #pantalla-admin .admin-seccion.card-admin {
+      background: #fff; border: 1px solid #e7edf5; border-radius: 15px;
+      padding: clamp(1.1rem, 2.5vw, 1.65rem); box-shadow: 0 8px 24px rgba(15,23,42,.045);
+      display: none;
+    }
+    #pantalla-admin .admin-seccion.card-admin.activa { display: block; }
+
+    .section-heading { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 1.35rem; }
+    .section-heading h2 { color: #172554; font-size: 1.25rem; margin: .15rem 0 .25rem; }
+    .section-heading p { color: #64748b; font-size: .88rem; margin: 0; }
+    .section-kicker { color: #2563eb; font-size: .68rem; font-weight: 800; letter-spacing: .11em; }
+
+    .admin-welcome { padding: 1.35rem 1.5rem; border-radius: 14px; color: white; background: linear-gradient(115deg,#172554,#1d4ed8); margin-bottom: 1rem; }
+    .admin-welcome .welcome-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .12em; opacity: .78; font-weight: 750; }
+    .admin-welcome h2 { color: white; font-size: 1.3rem; margin: .25rem 0; }
+    .admin-welcome p { color: #dbeafe; font-size: .88rem; margin: 0; max-width: 650px; }
+
+    .admin-shortcuts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
+    .admin-shortcut { display: flex; align-items: flex-start; gap: .8rem; padding: 1.05rem; background: #fff; border: 1px solid #e5edf7; border-radius: 12px; text-align: left; cursor: pointer; transition: .18s ease; }
+    .admin-shortcut:hover { border-color: #93c5fd; transform: translateY(-2px); box-shadow: 0 8px 18px rgba(37,99,235,.08); }
+    .admin-shortcut .shortcut-icon { flex: 0 0 2.25rem; height: 2.25rem; display: grid; place-items: center; border-radius: 9px; color: #2563eb; background: #eff6ff; font-size: 1.05rem; }
+    .admin-shortcut strong { display: block; color: #1e293b; font-size: .9rem; }
+    .admin-shortcut small { display: block; color: #64748b; font-size: .78rem; margin-top: .18rem; line-height: 1.4; }
+
+    #pantalla-admin .form-group { margin-bottom: 1rem; }
+    #pantalla-admin .form-group label { display: block; color: #334155; font-weight: 650; font-size: .86rem; margin-bottom: .38rem; }
+    #pantalla-admin input, #pantalla-admin select { width: 100%; min-height: 45px; padding: 8px 12px; border-radius: 9px; border: 1px solid #dbe3ee; background: #fbfdff; font-size: 14px; }
+    #pantalla-admin input:focus, #pantalla-admin select:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(59,130,246,.12); outline: none; }
+
+    #pantalla-admin .stats-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+    #pantalla-admin .stat-box { position: relative; text-align: left; background: linear-gradient(145deg,#fff,#f8fbff); border: 1px solid #e5edf7; border-radius: 13px; padding: 1.1rem 1.15rem; }
+    #pantalla-admin .stat-box .num { font-size: 2rem; font-weight: 800; color: #172554; margin-top: .35rem; }
+    #pantalla-admin .stat-box .lbl { font-size: .78rem; color: #64748b; }
+    .stat-icon { width: 2rem; height: 2rem; display: grid; place-items: center; border-radius: 8px; background: #eff6ff; color: #2563eb; font-weight: 800; }
+
+    .table-wrap { border: 1px solid #e8edf4; border-radius: 10px; overflow-x: auto; }
+    .tabla { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .tabla th, .tabla td { padding: 0.6rem 0.7rem; text-align: left; border-bottom: 1px solid #e8edf4; }
+    .tabla th { background: #f7f9fc; color: #64748b; white-space: nowrap; font-size: 0.78rem; text-transform: uppercase; }
+
+    .usuario-generado { background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 1.1rem; margin-top: 0.9rem; display: none; }
+    .usuario-generado.visible { display: block; }
+    .usuario-codigo { font-family: monospace; font-size: 1.1rem; font-weight: 700; letter-spacing: 0.04em; margin: 0.4rem 0; }
+    .hidden { display: none !important; }
+
+    /* ===== ESTILOS ADICIONALES ===== */
+    :focus-visible { outline: 3px solid var(--p); outline-offset: 2px; }
+    .ln-nav :focus-visible, .hero :focus-visible, .fin :focus-visible, .ft :focus-visible { outline-color: #fcd34d; }
+
+    .demo-box { max-width: 720px; margin: 0 auto; }
+    .demo-box .mock { padding: 28px; }
+    .demo-box .mock .o { font-size: 14px; }
+    .demo-meta { font-size: 12px; color: var(--mu); font-weight: 600; margin-bottom: 12px; text-transform: uppercase; letter-spacing: .03em; }
+    .demo-estado, .demo-intro { color: var(--mu); font-size: 14px; margin-bottom: 16px; }
+    .demo-res { margin-top: 16px; padding: 14px 16px; border-radius: 12px; font-size: 14px; }
+    .demo-res.ok { background: #ecfdf5; color: var(--okd); border: 1px solid #a7f3d0; }
+    .demo-res.no { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+    .demo-res p { margin-top: 8px; color: var(--tx); }
+    .demo-acciones { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+
+    dialog { border: 0; border-radius: 20px; padding: 0; margin: auto; width: calc(100% - 32px); max-width: 420px; box-shadow: 0 30px 80px rgba(0,0,0,.35); color: var(--tx); }
+    dialog::backdrop { background: rgba(15,23,42,.6); }
+    #modal-legal { max-width: 560px; }
+    .modal-body { padding: 28px; }
+    .modal-body h2 { font-size: 20px; margin-bottom: 6px; }
+    .legal-aviso { display: inline-block; background: #fef3c7; color: #92400e; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 8px; margin: 8px 0 12px; }
+    .legal-cuerpo { max-height: 50vh; overflow-y: auto; margin-bottom: 16px; }
+    .legal-cuerpo h3 { font-size: 14px; margin: 14px 0 4px; }
+    .legal-cuerpo p { font-size: 13px; color: var(--mu); }
+
+    @media (max-width: 850px) {
+      .hero .wrap { grid-template-columns: 1fr; }
+      .ln-links a:not(.btn) { display: none; }
+      .admin-layout { grid-template-columns: 1fr; }
+      .admin-tabs { position: static; flex-direction: row; overflow-x: auto; padding: .55rem; }
+      .admin-tab { flex: 0 0 auto; width: auto; white-space: nowrap; }
+      .admin-shortcuts { grid-template-columns: 1fr; }
+      #pantalla-admin .stats-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <svg width="0" height="0" style="position:absolute">
+    <symbol id="logo" viewBox="0 0 32 32">
+      <rect width="32" height="32" rx="9" fill="#4f46e5"/>
+      <path d="M16 7l10 5-10 5-10-5 10-5z" fill="#fff"/>
+      <path d="M10 15.5v4.2c0 1.6 2.7 3.3 6 3.3s6-1.7 6-3.3v-4.2l-6 3-6-3z" fill="#fff" opacity=".85"/>
+      <circle cx="26" cy="13" r="2" fill="#f59e0b"/>
+    </symbol>
+  </svg>
+
+  <!-- ==================== 1. LANDING PAGE ==================== -->
+  <div id="pantalla-inicio" class="pantalla activa">
+    <div class="franja-ecuador"></div>
+    <nav class="ln-nav">
+      <div class="wrap">
+        <a href="#" class="brand-logo"><svg class="lg"><use href="#logo"/></svg>ApruebaDocente</a>
+        <div class="ln-links">
+          <a href="#incluye">Qué incluye</a>
+          <a href="#precios">Precio</a>
+          <a href="#faq">Preguntas</a>
+          <button class="btn btn-outline-white" onclick="accederAdmin(event)">Soy administrador</button>
+          <button class="btn btn-primary" onclick="mostrarPantalla('pantalla-login')">Ya tengo licencia</button>
+        </div>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <div class="wrap">
+        <div>
+          <span class="conf-badge">✔ Banco alineado al temario INEVAL EVDO 2026–2027</span>
+          <h1>Aprueba tu examen docente entrenando con <em>3.500+ preguntas reales</em></h1>
+          <p class="sub">Aprende entrenando. Diseñado para optimizar tu tiempo de estudio con retroalimentación inmediata.</p>
+          <div class="ctas">
+            <a href="https://wa.me/593983941622?text=Hola,%20quiero%20informaci%C3%B3n%20sobre%20ApruebaDocente" target="_blank" class="btn btn-cta btn-lg">Quiero información por WhatsApp</a>
+            <button class="btn btn-outline-white btn-lg" onclick="mostrarPantalla('pantalla-login')">Ingresar al simulador</button>
+          </div>
+          <small>💬 Atención directa por WhatsApp · Acceso desde cualquier dispositivo</small>
+        </div>
+        <div class="mock" aria-hidden="true">
+          <div class="dots"><i></i><i></i><i></i><span>Vista previa del simulador</span></div>
+          <div class="top"><span>Simulacro · Pregunta 14 de 20</span><span class="tm">⏱ 118:42</span></div>
+          <div class="q">La Zona de Desarrollo Próximo de Vygotsky se define como:</div>
+          <div class="o">A. El nivel que el estudiante ya domina solo.</div>
+          <div class="o s">B. La distancia entre lo que hace solo y con ayuda. ✓</div>
+          <div class="o">C. El espacio físico donde se realiza la clase.</div>
+          <div class="pg"><i></i></div>
+          <div class="chip">✓ Argumento explicado en cada pregunta</div>
+        </div>
+      </div>
+    </header>
+
+    <section class="prueba-bar">
+      <div class="wrap">
+        <div><b>3.500+</b><span>preguntas del temario INEVAL</span></div>
+        <div><b>100%</b><span>cobertura de componentes</span></div>
+        <div><b>Acceso</b><span>ilimitado a tu fase</span></div>
+      </div>
+    </section>
+
+    <section class="sec alt" id="demo">
+      <div class="wrap">
+        <h2>Prueba una pregunta gratis</h2>
+        <p class="lead">Responde un reactivo real del banco y mira la retroalimentación que recibirás en cada pregunta.</p>
+        <div class="demo-box">
+          <div class="mock" id="demo-card">
+            <div id="demo-contenido" aria-live="polite">
+              <p class="demo-intro">Se elegirá una pregunta al azar de la Fase 1.</p>
+              <button type="button" class="btn btn-primary" id="btn-demo" onclick="cargarDemo()">Mostrar una pregunta</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" id="incluye">
+      <div class="wrap">
+        <h2>¿Qué incluye ApruebaDocente?</h2>
+        <p class="lead">Todo lo que necesitas para prepararte, en una sola licencia.</p>
+        <div class="g4">
+          <div class="ben"><div class="cap c-i">📚</div><h3>Banco Actualizado</h3><p>Preguntas organizadas por fase y especialidad.</p></div>
+          <div class="ben"><div class="cap c-a">⏱️</div><h3>Simulacro Cronometrado</h3><p>Examen simulado tipo real con tiempo límite.</p></div>
+          <div class="ben"><div class="cap c-v">💡</div><h3>Evaluación Diagnóstica</h3><p>Retroalimentación inmediata para medir tu nivel.</p></div>
+          <div class="ben"><div class="cap c-r">🧠</div><h3>Explicaciones Claras</h3><p>Argumento pedagógico en cada pregunta.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec alt">
+      <div class="wrap">
+        <h2>Cómo funciona</h2>
+        <p class="lead">Tres sencillos pasos para iniciar tu preparación.</p>
+        <div class="g3">
+          <div class="paso"><div class="n">1</div><h3>Solicita tu licencia</h3><p>Coordinamos tu fase y asignatura por WhatsApp.</p></div>
+          <div class="paso"><div class="n">2</div><h3>Ingresa con tu usuario</h3><p>Utiliza tu código de acceso personal.</p></div>
+          <div class="paso"><div class="n">3</div><h3>Practica a tu ritmo</h3><p>Realiza diagnósticos y simulacros ilimitados.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec pricing-section" id="precios">
+      <div class="wrap">
+        <h2>Un solo plan. Acceso completo.</h2>
+        <p class="lead">Sin niveles ni cobros adicionales. Todo incluido en una sola licencia.</p>
+        <div class="precios">
+          <div class="plan">
+            <span class="tag">Acceso Completo</span>
+            <h3>Plan Único ApruebaDocente</h3>
+            <div class="pr">$15 <small>/ pago único</small></div>
+            <ul>
+              <li>Banco de preguntas completo (3.500+ preguntas)</li>
+              <li>Simulacros cronometrados estilo INEVAL</li>
+              <li>Evaluación diagnóstica con retroalimentación</li>
+              <li>Explicación pedagógica detallada por pregunta</li>
+              <li>Acceso ilimitado desde cualquier dispositivo</li>
+              <li>Seguimiento de progreso e historial</li>
+            </ul>
+            <a href="https://wa.me/593983941622?text=Hola,%20quiero%20adquirir%20mi%20licencia%20de%20%2415%20de%20ApruebaDocente" target="_blank" class="btn btn-cta btn-block btn-lg">Solicitar Licencia por WhatsApp</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec alt" id="faq">
+      <div class="wrap">
+        <h2 style="margin-bottom:32px">Preguntas frecuentes</h2>
+        <details><summary>¿Cómo recibo mi acceso?</summary><p>Te enviamos tu código de usuario personal inmediatamente después de coordinar por WhatsApp.</p></details>
+        <details><summary>¿Puedo usarlo desde mi celular?</summary><p>Sí, la plataforma es 100% responsiva y funciona en celulares, tablets y computadoras.</p></details>
+        <details><summary>¿Incluye las preguntas de mi asignatura?</summary><p>Sí, cada prueba integra los componentes generales (Digitales y Pedagógicos) y tu asignatura específica.</p></details>
+      </div>
+    </section>
+
+    <section class="fin">
+      <h2>Empieza hoy a entrenar para tu examen</h2>
+      <button class="btn btn-cta btn-lg" onclick="mostrarPantalla('pantalla-login')">Ingresar al simulador</button>
+    </section>
+
+    <footer class="ft">
+      <div class="wrap">
+        <div class="cols">
+          <div><div class="brand-logo"><svg class="lg"><use href="#logo"/></svg>ApruebaDocente</div><p>Plataforma de preparación para la EVDO 2026-2027.<br>Ecuador</p></div>
+          <div><h4>Contacto</h4><a href="https://wa.me/593983941622" target="_blank">WhatsApp: +593 98 394 1622</a></div>
+          <div><h4>Acceso</h4><a href="#" onclick="mostrarPantalla('pantalla-login'); return false;">Ingresar</a><a href="#" onclick="accederAdmin(event)">Soy administrador</a></div>
+          <div><h4>Legal</h4><a href="#" onclick="abrirLegal('terminos'); return false;">Términos y condiciones</a><a href="#" onclick="abrirLegal('privacidad'); return false;">Política de privacidad</a><p style="margin-top:8px">© 2026 ApruebaDocente.<br>Plataforma independiente.</p></div>
+        </div>
+        <div class="cp">ApruebaDocente no está afiliado ni representa al INEVAL o Ministerio de Educación.</div>
+      </div>
+    </footer>
+
+    <a class="wa-f" href="https://wa.me/593983941622?text=Hola,%20quiero%20informaci%C3%B3n" target="_blank" aria-label="WhatsApp">💬</a>
+  </div>
+
+  <!-- ==================== 2. PANTALLA LOGIN ==================== -->
+  <div id="pantalla-login" class="pantalla">
+    <div class="login-container">
+      <svg class="lg" style="margin-bottom:12px"><use href="#logo"/></svg>
+      <h1>Ingreso a ApruebaDocente</h1>
+      <p class="subtitulo">Introduce tu usuario o licencia de acceso</p>
+      <div class="login-form">
+        <label for="input-licencia">Usuario / Licencia</label>
+        <input type="text" id="input-licencia" placeholder="ej. maria.cevallos-ueqa" autocomplete="username">
+        
+        <!-- Bloque dinámico para licencias EVDO -->
+        <div id="bloque-evdo-config" class="hidden" style="margin-bottom: 12px;">
+          <label for="login-evdo-fase">Fase asignada</label>
+          <select id="login-evdo-fase" onchange="actualizarAsignaturasEvdoLogin()">
+            <option value="">— Selecciona tu fase —</option>
+            <option value="1">Fase 1 (2026)</option>
+            <option value="2">Fase 2 (2026)</option>
+            <option value="3">Fase 3 (2027)</option>
+            <option value="4">Fase 4 (2027-2028)</option>
+          </select>
+
+          <label for="login-evdo-asignatura" style="margin-top: 8px;">Asignatura / Especialidad</label>
+          <select id="login-evdo-asignatura">
+            <option value="">— Primero elige la fase —</option>
+          </select>
+        </div>
+
+        <button class="btn btn-primary btn-block" id="btn-entrar" onclick="iniciarSesion()">Ingresar al simulador</button>
+        <div id="login-error" class="alerta-err hidden"></div>
+      </div>
+      <div style="margin-top:20px; font-size:13px;">
+        <a href="#" onclick="accederAdmin(event)" style="color:var(--mu); text-decoration:none;">Acceso administrador</a><br><br>
+        <a href="#" onclick="mostrarPantalla('pantalla-inicio'); return false;" style="color:var(--p); text-decoration:none;">← Volver a la página principal</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 3. PANEL DOCENTE ==================== -->
+  <div id="pantalla-panel" class="pantalla">
+    <header class="topbar">
+      <div class="brand-logo" style="color:var(--ink)"><svg class="lg"><use href="#logo"/></svg>ApruebaDocente</div>
+      <div style="display:flex; gap:12px; align-items:center;">
+        <span id="user-licencia" style="font-size:13px; font-family:monospace; color:var(--mu);"></span>
+        <button class="btn btn-ghost" onclick="mostrarPantalla('pantalla-historial')">Historial</button>
+        <button class="btn btn-ghost" onclick="cerrarSesion()">Salir</button>
+      </div>
+    </header>
+    <main class="panel-main">
+      <div class="info-usuario" id="resumen-intentos"></div>
+      <div style="background:#fff; border-radius:16px; padding:24px; border:1px solid var(--ln); box-shadow:var(--shadow)">
+        <h2 style="font-size:18px; margin-bottom:6px;">Tu espacio de preparación</h2>
+        <p style="color:var(--mu); font-size:14px; margin-bottom:20px;">Tu examen integra preguntas de Digitales, Pedagógicos y tu especialidad.</p>
+        
+        <p id="panel-fase-alerta" class="alerta-err hidden" style="margin-bottom:16px; text-align:left; font-size:14px; font-weight:600; padding:10px; background:#fef2f2; border-radius:8px; border:1px solid #fecaca;"></p>
+
+        <div class="acciones-examen">
+          <div class="accion-card">
+            <h3>Evaluación Diagnóstica</h3>
+            <p style="font-size:13px; color:var(--mu); margin:8px 0 16px"></p>
+            <button class="btn btn-primary btn-block" id="btn-iniciar-diag" onclick="iniciarExamen('diagnostico')">Comenzar diagnóstico</button>
+          </div>
+          <div class="accion-card">
+            <h3>Simulacro Oficial</h3>
+            <p style="font-size:13px; color:var(--mu); margin:8px 0 16px">120 min</p>
+            <button class="btn btn-success btn-block" id="btn-iniciar-sim" onclick="iniciarExamen('simulacro')">Iniciar simulacro</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ==================== 4. PANTALLA EXAMEN ==================== -->
+  <div id="pantalla-examen" class="pantalla">
+    <header class="topbar">
+      <div class="brand-logo" style="color:var(--ink)"><svg class="lg"><use href="#logo"/></svg>ApruebaDocente</div>
+      <div style="display:flex; gap:16px; align-items:center;">
+        <span id="timer" class="tm hidden">⏱ 165:00</span>
+        <button class="btn btn-ghost" onclick="cancelarExamen()">Salir del examen</button>
+      </div>
+    </header>
+    <main class="panel-main">
+      <div class="examen-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h2 id="titulo-examen" style="font-size:18px;">Evaluación</h2>
+          <span id="progreso-texto" style="font-size:13px; color:var(--mu); font-weight:600;"></span>
+        </div>
+        <div id="pregunta-meta" class="demo-meta"></div>
+        <div id="pregunta-actual" class="q" style="font-size:16px; margin:16px 0;"></div>
+        <div id="opciones-container" role="group" aria-label="Opciones de respuesta"></div>
+        <div id="explicacion-box" class="hidden"></div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <button class="btn btn-secondary" id="btn-prev" onclick="navegarPregunta(-1)">← Anterior</button>
+        <div id="navegador-preguntas" class="navegador-grid"></div>
+        <button class="btn btn-primary" id="btn-siguiente" onclick="navegarPregunta(1)">Siguiente →</button>
+        <button class="btn btn-success hidden" id="btn-finalizar" onclick="finalizarExamen(false)">Finalizar Examen</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- ==================== 5. PANTALLA RESULTADOS ==================== -->
+  <div id="pantalla-resultados" class="pantalla">
+    <header class="topbar">
+      <div class="brand-logo" style="color:var(--ink)"><svg class="lg"><use href="#logo"/></svg>ApruebaDocente</div>
+      <button class="btn btn-primary" onclick="mostrarPantalla('pantalla-panel')">Volver al panel</button>
+    </header>
+    <main class="panel-main">
+      <div class="examen-card" style="text-align:center;">
+        <div id="resultado-resumen"></div>
+      </div>
+      <div class="examen-card">
+        <h3 style="margin-bottom:16px;">Revisión de respuestas</h3>
+        <div id="resultado-detalle"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ==================== 6. PANTALLA HISTORIAL ==================== -->
+  <div id="pantalla-historial" class="pantalla">
+    <header class="topbar">
+      <div class="brand-logo" style="color:var(--ink)"><svg class="lg"><use href="#logo"/></svg>ApruebaDocente</div>
+      <button class="btn btn-secondary" onclick="mostrarPantalla('pantalla-panel')">Volver al panel</button>
+    </header>
+    <main class="panel-main">
+      <div class="examen-card">
+        <h2 style="font-size:20px; margin-bottom:16px;">Historial de evaluaciones</h2>
+        <div class="table-wrap">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Fase</th>
+                <th>Asignatura</th>
+                <th>Puntaje</th>
+                <th>Resultado</th>
+              </tr>
+            </thead>
+            <tbody id="historial-lista"></tbody>
+          </table>
+        </div>
+        <p id="historial-vacio" class="hidden" style="text-align:center; color:var(--mu); margin-top:20px;">No has realizado evaluaciones todavía.</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- ==================== 7. PANTALLA ADMINISTRACIÓN ==================== -->
+  <div id="pantalla-admin" class="pantalla">
+    <div class="franja-ecuador"></div>
+    <div class="wrap app-pad">
+      <div class="header-admin">
+        <div>
+          <h1>Centro de administración</h1>
+          <div class="admin-header-sub">ApruebaDocente <span>·</span> Gestión y seguimiento de evaluaciones</div>
+        </div>
+        <button class="btn btn-secondary" onclick="salirAdmin()">Salir al inicio</button>
+      </div>
+
+      <div class="admin-layout">
+        <nav class="admin-tabs" aria-label="Navegación de administración">
+          <button class="admin-tab activa" data-tab="resumen" onclick="cambiarTabAdmin('resumen')"><span class="tab-symbol">⌂</span>Resumen general</button>
+          <button class="admin-tab" data-tab="crear" onclick="cambiarTabAdmin('crear')"><span class="tab-symbol">＋</span>Registrar docente</button>
+          <button class="admin-tab" data-tab="stats" onclick="cambiarTabAdmin('stats')"><span class="tab-symbol">▥</span>Analítica y estadísticas</button>
+          <button class="admin-tab" data-tab="usuarios" onclick="cambiarTabAdmin('usuarios')"><span class="tab-symbol">♙</span>Docentes registrados</button>
+          <button class="admin-tab" data-tab="resultados" onclick="cambiarTabAdmin('resultados')"><span class="tab-symbol">▤</span>Resultados recientes</button>
+          <button class="admin-tab" data-tab="fallos" onclick="cambiarTabAdmin('fallos')"><span class="tab-symbol">◉</span>Análisis de preguntas</button>
+        </nav>
+
+        <main class="admin-content">
+          <!-- SECCIÓN: Resumen general -->
+          <section id="admin-resumen" class="admin-seccion card-admin activa">
+            <div class="admin-welcome">
+              <div class="welcome-label">Panel de control</div>
+              <h2>Bienvenido al centro de administración</h2>
+              <p>Desde aquí puedes gestionar los accesos de docentes, consultar el rendimiento de las evaluaciones y detectar oportunidades de mejora.</p>
+            </div>
+            <div class="admin-shortcuts">
+              <button class="admin-shortcut" onclick="cambiarTabAdmin('crear')"><span class="shortcut-icon">＋</span><span><strong>Registrar un docente</strong><small>Crea una licencia y asigna su fase y especialidad.</small></span></button>
+              <button class="admin-shortcut" onclick="cambiarTabAdmin('stats')"><span class="shortcut-icon">▥</span><span><strong>Revisar estadísticas</strong><small>Consulta evaluaciones, aprobados y puntajes promedio.</small></span></button>
+              <button class="admin-shortcut" onclick="cambiarTabAdmin('usuarios')"><span class="shortcut-icon">♙</span><span><strong>Gestionar docentes</strong><small>Visualiza los usuarios registrados y sus intentos.</small></span></button>
+              <button class="admin-shortcut" onclick="cambiarTabAdmin('resultados')"><span class="shortcut-icon">▤</span><span><strong>Ver resultados recientes</strong><small>Da seguimiento a los últimos resultados obtenidos.</small></span></button>
+              <button class="admin-shortcut" onclick="cambiarTabAdmin('fallos')"><span class="shortcut-icon">◉</span><span><strong>Detectar preguntas difíciles</strong><small>Identifica los temas que requieren mayor refuerzo.</small></span></button>
+              <button class="admin-shortcut" onclick="cambiarTabAdmin('crear')"><span class="shortcut-icon">↗</span><span><strong>Crear acceso de demostración</strong><small>Genera un usuario temporal para realizar pruebas.</small></span></button>
+            </div>
+          </section>
+
+          <!-- SECCIÓN: Registrar docente -->
+          <section id="admin-crear" class="admin-seccion card-admin">
+            <div class="section-heading">
+              <div><span class="section-kicker">ACCESOS</span><h2>Registrar nuevo docente</h2><p>Genera una licencia de acceso vinculada a la fase y asignatura del docente.</p></div>
+            </div>
+            <div class="form-group">
+              <label for="admin-nombre">Nombre completo del docente</label>
+              <input type="text" id="admin-nombre" placeholder="Ej. María Cevallos" />
+            </div>
+            <div class="form-group">
+              <label for="admin-fase">Fase de evaluación *</label>
+              <select id="admin-fase" onchange="actualizarAsignaturasAdmin()">
+                <option value="">— Seleccione fase —</option>
+                <option value="1">Fase 1 (2026)</option>
+                <option value="2">Fase 2 (2026)</option>
+                <option value="3">Fase 3 (2027)</option>
+                <option value="4">Fase 4 (2027-2028)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="admin-asignatura">Asignatura o especialidad *</label>
+              <select id="admin-asignatura"><option value="">— Primero elija fase —</option></select>
+            </div>
+            <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="generarUsuarioAdmin()">Crear acceso docente</button>
+              <button class="btn btn-secondary" onclick="generarUsuarioTemporal()">Crear acceso de demostración</button>
+            </div>
+            <div class="usuario-generado" id="codigo-generado">
+              <strong id="codigo-generado-label">Usuario creado:</strong>
+              <div class="usuario-codigo" id="usuario-codigo"></div>
+              <div id="nota-temporal" class="hidden" style="font-size:0.85rem; color:var(--mu); margin-bottom:0.5rem;">
+                ⚠ Usuario temporal de prueba. Prefijo “prueba-”.
+              </div>
+              <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.6rem;">
+                <button class="btn btn-secondary" onclick="copiarUsuario()">Copiar</button>
+                <button class="btn btn-success" onclick="enviarWhatsApp()">Enviar por WhatsApp</button>
+              </div>
+            </div>
+            <div id="admin-crear-alerta" class="alerta-err hidden" style="margin-top:0.9rem;"></div>
+          </section>
+
+          <!-- SECCIÓN: Estadísticas -->
+          <section id="admin-stats" class="admin-seccion card-admin">
+            <div class="section-heading">
+              <div><span class="section-kicker">INDICADORES</span><h2>Analítica y estadísticas</h2><p>Consulta el comportamiento general de las evaluaciones registradas.</p></div>
+            </div>
+            <div class="stats-grid">
+              <div class="stat-box"><div class="stat-icon">▤</div><div class="num" id="stat-total">0</div><div class="lbl">Evaluaciones realizadas</div></div>
+              <div class="stat-box"><div class="stat-icon">✓</div><div class="num" id="stat-aprobados">0</div><div class="lbl">Evaluaciones aprobadas</div></div>
+              <div class="stat-box"><div class="stat-icon">↗</div><div class="num" id="stat-promedio">0</div><div class="lbl">Puntaje promedio</div></div>
+            </div>
+            <h3 style="margin:1.1rem 0 0.65rem; font-size:0.98rem;">Distribución de puntajes</h3>
+            <div class="table-wrap">
+              <table class="tabla"><thead><tr><th>Rango</th><th>Cantidad</th></tr></thead><tbody id="stats-rangos"></tbody></table>
+            </div>
+          </section>
+
+          <!-- SECCIÓN: Docentes Registrados -->
+          <section id="admin-usuarios" class="admin-seccion card-admin">
+            <div class="section-heading">
+              <div><span class="section-kicker">DIRECTORIO</span><h2>Docentes registrados</h2><p>Listado de accesos, fase asignada y actividad de cada docente.</p></div>
+            </div>
+            <div class="table-wrap">
+              <table class="tabla"><thead><tr><th>Usuario</th><th>Fase</th><th>Asignatura</th><th>Intentos</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="admin-usuarios-body"></tbody></table>
+            </div>
+          </section>
+
+          <!-- SECCIÓN: Resultados Recientes -->
+          <section id="admin-resultados" class="admin-seccion card-admin">
+            <div class="section-heading">
+              <div><span class="section-kicker">ACTIVIDAD</span><h2>Resultados recientes</h2><p>Revisa los puntajes y el estado de las evaluaciones más recientes.</p></div>
+            </div>
+            <div class="table-wrap">
+              <table class="tabla"><thead><tr><th>Fecha</th><th>Licencia</th><th>Fase</th><th>Asignatura</th><th>Puntaje</th><th>Estado</th></tr></thead><tbody id="admin-resultados-body"></tbody></table>
+            </div>
+          </section>
+
+          <!-- SECCIÓN: Análisis de Preguntas -->
+          <section id="admin-fallos" class="admin-seccion card-admin">
+            <div class="section-heading">
+              <div><span class="section-kicker">MEJORA</span><h2>Análisis de preguntas</h2><p>Identifica las preguntas con mayor frecuencia de respuestas incorrectas.</p></div>
+            </div>
+            <div class="table-wrap">
+              <table class="tabla"><thead><tr><th>ID</th><th>Fase</th><th>Materia / Tema</th><th>Veces fallada</th></tr></thead><tbody id="admin-fallos-body"></tbody></table>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODALES ==================== -->
+  <dialog id="modal-admin" aria-labelledby="modal-admin-titulo">
+    <div class="modal-body">
+      <h2 id="modal-admin-titulo">Acceso de administrador</h2>
+      <p class="subtitulo">Introduce la clave para continuar.</p>
+      <form class="login-form" onsubmit="return adminLogin(event)" novalidate>
+        <label for="admin-clave-input">Clave de administrador</label>
+        <input type="password" id="admin-clave-input" autocomplete="off">
+        <button type="submit" class="btn btn-primary btn-block" id="btn-admin-verificar">Verificar</button>
+        <div id="admin-clave-error" class="alerta-err hidden" role="alert"></div>
+      </form>
+      <button type="button" class="btn btn-ghost btn-block" style="margin-top:12px" onclick="cerrarModalAdmin()">Cancelar</button>
+    </div>
+  </dialog>
+
+  <dialog id="modal-legal" aria-labelledby="legal-titulo">
+    <div class="modal-body">
+      <h2 id="legal-titulo"></h2>
+      <span class="legal-aviso">Documento en revisión</span>
+      <div class="legal-cuerpo" id="legal-cuerpo"></div>
+      <button type="button" class="btn btn-secondary btn-block" onclick="cerrarLegal()">Cerrar</button>
+    </div>
+  </dialog>
+
+  <!-- Importaciones al final del cuerpo HTML -->
+  <script src="config.js"></script>
+  <script src="preguntas.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
