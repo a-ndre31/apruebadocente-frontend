@@ -1,4 +1,9 @@
 /* =====================================================================
+   app.js · NÚCLEO: constantes, estado, utilidades, Supabase, navegación,
+   login/sesión, panel docente y carga de los JSON del banco (por fase).
+   Carga: config.js → app.js → examen.js → admin.js
+   ===================================================================== */
+/* =====================================================================
    ApruebaDocente · Código Completo (app.js)
    Integración funcional de B1, B2, B3, B4 y B5.
    ===================================================================== */
@@ -66,7 +71,6 @@ const LEGAL = {
 let supabaseClient = null;
 let supabaseListo = false;
 let adminClave = null;
-let bancoCargado = null; // Reemplaza a bancoPromesa
 
 // Sesión docente
 let sesionActual = null;
@@ -80,8 +84,6 @@ let demoRespondida = false;
 // Examen Activo
 let examenActual = null; 
 
-// Admin temporales
-let usuarioGeneradoTemp = '';
 
 /* ---------- 3. UTILIDADES GENERALES ---------- */
 function $(id) { return document.getElementById(id); }
@@ -180,70 +182,106 @@ function init() {
 
 document.addEventListener('DOMContentLoaded', init);
 
-/* ---------- 6. BANCO DE PREGUNTAS (CARGA DESDE JSON) ---------- */
-const ARCHIVOS_JSON = [
-  "EVDO 2026 Biologia 350 Reactivos",
-  "EVDO 2026 Ciencias Naturales 350 Reactivos",
-  "EVDO 2026 Ciencias Sociales 350 Reactivos",
-  "EVDO 2026 Ciudadania 350 Reactivos",
-  "EVDO 2026 Digitales 350 Reactivos",
-  "EVDO 2026 EGB 2a7 350 Reactivos",
-  "EVDO 2026 Filosofia 350 Reactivos",
-  "EVDO 2026 Pedagogicos 350 Reactivos",
-  "EVDO EGB 350 Revisado",
-  "EVDO Emprendimiento 350 Revisado",
-  "EVDO Quimica 350 Revisado"
+/* ---------- 6. BANCO DE PREGUNTAS (./data/*.json) ---------- */
+/* Cada archivo JSON se asocia a su materia/asignatura. Los nombres deben coincidir
+   EXACTAMENTE con los archivos de la carpeta data/. */
+const BANCO_JSON = [
+  { fase: 1, archivo: 'EVDO 2026 Digitales 350 Reactivos',   materia: 'Digitales',   asignatura: 'General' },
+  { fase: 1, archivo: 'EVDO 2026 Pedagogicos 350 Reactivos', materia: 'Pedagógicos', asignatura: 'General' },
+  { fase: 1, archivo: 'EVDO 2026 EGB 2a7 350 Reactivos',     materia: 'Específica',  asignatura: 'EGB Básica Media y Elemental (2.º a 7.º)' },
+  { fase: 1, archivo: 'EVDO EGB 350 Revisado',               materia: 'Específica',  asignatura: 'EGB Básica Media y Elemental (2.º a 7.º)' },
+  { fase: 1, archivo: 'EVDO 2026 Ciencias Sociales 350 Reactivos', materia: 'Específica', asignatura: 'EGB Superior (8.º a 10.º) Estudios Sociales' },
+  { fase: 1, archivo: 'EVDO 2026 Ciencias Naturales 350 Reactivos', materia: 'Específica', asignatura: 'EGB Superior (8.º a 10.º) Ciencias Naturales' },
+  { fase: 1, archivo: 'EVDO Emprendimiento 350 Revisado',    materia: 'Específica',  asignatura: 'BGU Emprendimiento y Gestión' },
+  { fase: 1, archivo: 'EVDO 2026 Filosofia 350 Reactivos',   materia: 'Específica',  asignatura: 'BGU Filosofía' },
+  { fase: 1, archivo: 'EVDO Quimica 350 Revisado',           materia: 'Específica',  asignatura: 'BGU Química' },
+  { fase: 1, archivo: 'EVDO 2026 Biologia 350 Reactivos',    materia: 'Específica',  asignatura: 'BGU Biología' },
+  { fase: 1, archivo: 'EVDO 2026 Ciudadania 350 Reactivos',  materia: 'Específica',  asignatura: 'BGU Educación para la Ciudadanía' }
 ];
 
-async function cargarBanco() {
-  if (bancoCargado) return bancoCargado;
+/* MAPEADOR de asignaturas: compara sin tildes, sin mayúsculas, sin signos (º, °, espacios)
+   y sin el rango entre paréntesis. "EGB Básica Media y Elemental (2.º a 7.º)" == "EGB Basica Media y Elemental". */
+function claveAsignatura(s) {
+  return String(s == null ? '' : s)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
 
-  console.log("Cargando bancos de preguntas...");
-  let todasLasPreguntas = [];
+const cacheBanco = {}; // archivo → preguntas ya convertidas
 
-  for (const archivo of ARCHIVOS_JSON) {
-    try {
-      const url = `./data/${encodeURIComponent(archivo)}.json`;
-      const respuesta = await fetch(url);
-      if (!respuesta.ok) throw new Error(`No se encontró ${archivo}`);
-      
-      const datos = await respuesta.json();
-      todasLasPreguntas = [...todasLasPreguntas, ...datos];
-    } catch (error) {
-      console.warn(`Advertencia: ${error.message}`);
-    }
+/* Convierte {id, materia, pregunta, opciones:[{letra,texto}], clave, argumento}
+   al formato interno {opciones:{A,B,C,D}, correcta, explicacion, ...} */
+function convertirPregunta(q, def, indice) {
+  const opciones = {};
+  (Array.isArray(q.opciones) ? q.opciones : []).forEach(op => { opciones[op.letra] = op.texto; });
+  return {
+    id: q.id || `${def.archivo}-${indice + 1}`,
+    fase: def.fase,
+    materia: def.materia,
+    asignatura: def.asignatura,
+    tema: q.tema || (def.asignatura === 'General' ? def.materia : def.asignatura),
+    subtema: q.subtema || 'General',
+    pregunta: q.pregunta,
+    opciones: opciones,
+    correcta: q.clave,
+    explicacion: q.argumento
+  };
+}
+
+async function cargarArchivoBanco(def) {
+  if (cacheBanco[def.archivo]) return cacheBanco[def.archivo];
+  const url = './data/' + encodeURIComponent(def.archivo) + '.json';
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`${def.archivo}.json (HTTP ${resp.status})`);
+  const datos = await resp.json();
+  if (!Array.isArray(datos)) throw new Error(`${def.archivo}.json no es una lista de preguntas`);
+  const convertidas = datos.map((q, i) => convertirPregunta(q, def, i));
+  const invalidas = convertidas.filter(q => !esPreguntaValida(q)).length;
+  if (invalidas) {
+    console.warn(`${def.archivo}.json: ${invalidas} de ${convertidas.length} preguntas sin clave de respuesta u opciones válidas (se descartan).`);
   }
+  cacheBanco[def.archivo] = convertidas;
+  return cacheBanco[def.archivo];
+}
 
-  // TRADUCCIÓN DE FORMATO:
-  // Convertimos los datos de Python al formato que espera tu app
-  bancoCargado = todasLasPreguntas.map((q, index) => {
-    const opcionesObj = {};
-    q.opciones.forEach(op => {
-      opcionesObj[op.letra] = op.texto;
-    });
-
-    let faseAsignada = 1; 
-    let tipoMateria = "Específica";
-    
-    if (q.materia.includes("Digitales")) tipoMateria = "Digitales";
-    if (q.materia.includes("Pedagogicos")) tipoMateria = "Pedagógicos";
-
-    return {
-      id: q.id || `P-${index}`,
-      fase: faseAsignada,
-      materia: tipoMateria,
-      asignatura: q.materia, // Nombre del archivo original
-      tema: q.materia, 
-      subtema: "General",
-      pregunta: q.pregunta,
-      opciones: opcionesObj,
-      correcta: q.clave,
-      explicacion: q.argumento
-    };
-  });
-
-  console.log(`✅ Banco cargado: ${bancoCargado.length} preguntas listas.`);
-  return bancoCargado;
+/* FILTRO POR FASE: solo se descargan los archivos de la fase del docente.
+   - cargarBanco(fase)             → solo Digitales de esa fase (demo de la landing)
+   - cargarBanco(fase, asignatura) → Digitales + Pedagógicos + archivos de su asignatura
+   Si la fase no tiene archivos para esa asignatura (fases 2-4 hoy) → lanza
+   "Sin preguntas disponibles aún" y NO descarga nada. */
+async function cargarBanco(fase, asignatura = null) {
+  const deLaFase = BANCO_JSON.filter(d => d.fase === Number(fase));
+  if (!deLaFase.length) {
+    throw new Error('Sin preguntas disponibles aún para esta fase.');
+  }
+  const claveDocente = claveAsignatura(asignatura);
+  const defs = deLaFase.filter(d =>
+    asignatura ? (d.asignatura === 'General' || claveAsignatura(d.asignatura) === claveDocente) : d.materia === 'Digitales'
+  );
+  if (asignatura && !defs.some(d => d.asignatura !== 'General')) {
+    console.error('Asignatura de la licencia no reconocida:', JSON.stringify(asignatura));
+    throw new Error(`La asignatura de tu licencia («${asignatura}») no coincide con ningún banco. Avisa al administrador.`);
+  }
+  const resultados = await Promise.allSettled(defs.map(cargarArchivoBanco));
+  const fallos = resultados.filter(r => r.status === 'rejected').map(r => r.reason.message);
+  if (fallos.length) {
+    throw new Error('No se pudo cargar el banco de preguntas: ' + fallos.join('; ') +
+      '. Revisa que la carpeta data/ esté junto a index.html y abre el sitio con un servidor local.');
+  }
+  // Sin repetidos: por id y por texto de la pregunta (los archivos "Revisado" repiten reactivos)
+  const vistos = new Set();
+  const banco = [];
+  resultados.forEach(r => r.value.forEach(q => {
+    const k = claveAsignatura(q.pregunta);
+    if (vistos.has(q.id) || vistos.has(k)) return;
+    vistos.add(q.id);
+    vistos.add(k);
+    banco.push(q);
+  }));
+  return banco;
 }
 
 function esPreguntaValida(q) {
@@ -258,7 +296,7 @@ async function cargarDemo() {
   if (!cont) return;
   cont.innerHTML = '<p class="demo-estado">Cargando reactivo...</p>';
   try {
-    const banco = await cargarBanco();
+    const banco = await cargarBanco(1);
     const pool = banco.filter(q => q.fase === 1 && q.id !== demoUltimoId && esPreguntaValida(q));
     if (!pool.length) throw new Error('No hay preguntas disponibles para Fase 1.');
     demoActual = pool[Math.floor(Math.random() * pool.length)];
@@ -369,6 +407,14 @@ function actualizarAsignaturasEvdoLogin() {
   });
 }
 
+/* Si el servidor devuelve fase/asignatura, mandan sobre lo guardado en localStorage. */
+function aplicarDatosServidor(ses, resp) {
+  const nueva = Object.assign({}, ses);
+  if (resp && resp.fase != null) nueva.fase = Number(resp.fase);
+  if (resp && resp.asignatura) nueva.asignatura = resp.asignatura;
+  return nueva;
+}
+
 function obtenerOGenerarTokenDispositivo() {
   let token = localStorage.getItem('evdo_device_token');
   if (!token) {
@@ -456,7 +502,7 @@ async function verificarSesionLocal() {
       return;
     }
 
-    sesionActual = obj;
+    sesionActual = aplicarDatosServidor(obj, data);
     iniciarRenovacionPeriodica();
     mostrarPantalla('pantalla-panel');
   } catch (e) {
@@ -500,7 +546,7 @@ function cerrarSesionLocalSilencioso() {
   localStorage.removeItem('evdo_sesion_activa');
 }
 
-/* ---------- 9. PANEL DOCENTE & MOTOR INTEGRAL (B3) ---------- */
+/* ---------- 9. PANEL DOCENTE & ARMADO DEL EXAMEN (filtro por fase/asignatura) ---------- */
 function actualizarPanelDocenteUI() {
   if (!sesionActual) return;
 
@@ -533,692 +579,27 @@ function actualizarPanelDocenteUI() {
   }
 }
 
-function esPermitida(pregunta, faseDocente, asignaturaDocente) {
-  if (!pregunta || pregunta.fase !== faseDocente) return false;
-  if (pregunta.materia === 'Digitales' || pregunta.materia === 'Pedagógicos') return true;
-  if (pregunta.materia === 'Específica' && pregunta.asignatura === asignaturaDocente) return true;
-  return false;
+/* Doble candado (motor): solo fase del docente + su asignatura + Digitales/Pedagógicos */
+function esPermitida(q, fase, asignatura) {
+  if (!q || q.fase !== Number(fase)) return false;
+  if (q.asignatura === 'General') return q.materia === 'Digitales' || q.materia === 'Pedagógicos';
+  return claveAsignatura(q.asignatura) === claveAsignatura(asignatura);
 }
 
-async function armarIntegral(fase, asignatura, totalPreguntas) {
-  const banco = await cargarBanco();
-  
-  // 1. Buscamos preguntas específicas usando palabras clave (para evitar problemas con nombres largos)
-  let poolEspecífica = banco.filter(q => 
-    q.fase === fase && 
-    q.materia === 'Específica' && 
-    q.asignatura.toLowerCase().includes(asignatura.toLowerCase().substring(0, 10)) && 
-    esPreguntaValida(q)
-  );
-
-  // Si no encuentra por nombre exacto, que tome todas las específicas de esa fase
-  if (poolEspecífica.length < (totalPreguntas * 0.5)) {
-      poolEspecífica = banco.filter(q => q.fase === fase && q.materia === 'Específica' && esPreguntaValida(q));
+/* Arma el examen integral. Sin "salvavidas": si falta una categoría, lanza error. */
+function armarIntegral(banco, fase, asignatura, nEsp, nPed, nDig) {
+  const pool = banco.filter(q => esPermitida(q, fase, asignatura) && esPreguntaValida(q));
+  const espP = pool.filter(q => q.asignatura !== 'General');
+  const pedP = pool.filter(q => q.materia === 'Pedagógicos');
+  const digP = pool.filter(q => q.materia === 'Digitales');
+  if (espP.length < nEsp || pedP.length < nPed || digP.length < nDig) {
+    throw new Error(`Faltan preguntas válidas para armar el examen (disponibles/necesarias → asignatura: ${espP.length}/${nEsp}, Pedagógicos: ${pedP.length}/${nPed}, Digitales: ${digP.length}/${nDig}). Revisa que los JSON tengan la clave de respuesta (campo "clave").`);
   }
-
-  const poolDigitales = banco.filter(q => q.fase === fase && q.materia === 'Digitales' && esPreguntaValida(q));
-  const poolPedagogicos = banco.filter(q => q.fase === fase && q.materia === 'Pedagógicos' && esPreguntaValida(q));
-
-  const cantEspecífica = Math.floor(totalPreguntas * 0.50);
-  const cantDigitales = Math.floor(totalPreguntas * 0.25);
-  const cantPedagogicos = totalPreguntas - cantEspecífica - cantDigitales;
-
-  // Seleccionamos
-  let seleccionEspecífica = barajar(poolEspecífica).slice(0, cantEspecífica);
-  let seleccionDigitales = barajar(poolDigitales).slice(0, cantDigitales);
-  let seleccionPedagogicos = barajar(poolPedagogicos).slice(0, cantPedagogicos);
-
-  let seleccionFinal = [...seleccionEspecífica, ...seleccionDigitales, ...seleccionPedagogicos];
-
-  // 2. SALVAVIDAS: Si falta alguna pregunta (porque no hay suficientes de una categoría), 
-  // rellenamos con cualquier otra pregunta válida que tengamos en el banco.
-  if (seleccionFinal.length < totalPreguntas) {
-    const idsActuales = seleccionFinal.map(q => q.id);
-    const restoDelBanco = banco.filter(q => q.fase === fase && !idsActuales.includes(q.id) && esPreguntaValida(q));
-    
-    // Agregamos las que falten
-    const faltantes = totalPreguntas - seleccionFinal.length;
-    seleccionFinal = [...seleccionFinal, ...barajar(restoDelBanco).slice(0, faltantes)];
-  }
-
-  if (seleccionFinal.length < totalPreguntas) {
-    throw new Error('No hay suficientes preguntas en total en el banco. Revisa que los JSON se cargaron bien.');
-  }
-
-  return barajar(seleccionFinal);
+  return barajar([
+    ...barajar(espP).slice(0, nEsp),
+    ...barajar(pedP).slice(0, nPed),
+    ...barajar(digP).slice(0, nDig)
+  ]);
 }
 
-async function armarIntegralEstructurado(fase, asignatura, cantEspecificas, cantPedagogicas, cantDigitales) {
-  const banco = await cargarBanco();
-  const totalRequerido = cantEspecificas + cantPedagogicas + cantDigitales;
-
-  // 1. Filtrar Específicas
-  let poolEspecificas = banco.filter(q => 
-    q.fase === fase && 
-    q.materia === 'Específica' && 
-    q.asignatura.toLowerCase().includes(asignatura.toLowerCase().substring(0, 10)) && 
-    esPreguntaValida(q)
-  );
-  
-  // Salvavidas para específicas
-  if (poolEspecificas.length < cantEspecificas) {
-      const especificasExtra = banco.filter(q => q.fase === fase && q.materia === 'Específica' && esPreguntaValida(q));
-      poolEspecificas = [...poolEspecificas, ...especificasExtra];
-  }
-
-  // 2. Filtrar Pedagógicas
-  let poolPedagogicas = banco.filter(q => q.fase === fase && q.materia === 'Pedagógicos' && esPreguntaValida(q));
-
-  // 3. Filtrar Digitales
-  let poolDigitales = banco.filter(q => q.fase === fase && q.materia === 'Digitales' && esPreguntaValida(q));
-
-  // 4. Seleccionar la cantidad exacta requerida
-  let seleccionEspecificas = barajar(poolEspecificas).slice(0, cantEspecificas);
-  let seleccionPedagogicas = barajar(poolPedagogicas).slice(0, cantPedagogicas);
-  let seleccionDigitales = barajar(poolDigitales).slice(0, cantDigitales);
-
-  let seleccionFinal = [...seleccionEspecificas, ...seleccionPedagogicas, ...seleccionDigitales];
-
-  // 5. Salvavidas general
-  if (seleccionFinal.length < totalRequerido) {
-    const idsActuales = seleccionFinal.map(q => q.id);
-    const restoDelBanco = banco.filter(q => q.fase === fase && !idsActuales.includes(q.id) && esPreguntaValida(q));
-    const faltantes = totalRequerido - seleccionFinal.length;
-    seleccionFinal = [...seleccionFinal, ...barajar(restoDelBanco).slice(0, faltantes)];
-  }
-
-  if (seleccionFinal.length < totalRequerido) {
-    throw new Error(`Faltan preguntas. Se necesitan ${totalRequerido} y solo hay ${seleccionFinal.length} disponibles.`);
-  }
-
-  return barajar(seleccionFinal);
-}
-/* ---------- 10. PANTALLA EXAMEN, ANTI-COPIA & RESULTADOS (B4) ---------- */
-function renderExamenUI() {
-  if (!examenActual) return;
-
-  const q = examenActual.preguntas[examenActual.indice];
-  const total = examenActual.preguntas.length;
-
-  $('titulo-examen').textContent = examenActual.tipo === 'diagnostico' ? 'Evaluación Diagnóstica' : 'Simulacro Oficial';
-  $('progreso-texto').textContent = `Pregunta ${examenActual.indice + 1} de ${total}`;
-  $('pregunta-meta').textContent = `${esc(q.id)} · ${esc(q.materia)} · ${esc(q.tema)}`;
-  $('pregunta-actual').innerHTML = fmt(q.pregunta);
-
-  const contOp = $('opciones-container');
-  contOp.innerHTML = '';
-  const seleccionada = examenActual.respuestas[q.id];
-  const respondidaDiag = examenActual.tipo === 'diagnostico' && examenActual.feedback[q.id];
-
-  LETRAS.forEach(l => {
-    const div = document.createElement('div');
-    div.className = 'o';
-    if (seleccionada === l) div.classList.add('s');
-
-    if (respondidaDiag) {
-      if (l === q.correcta) div.classList.add('s');
-      else if (seleccionada === l) div.classList.add('x');
-    }
-
-    div.innerHTML = `<strong>${l}.</strong> ${esc(q.opciones[l])}`;
-    div.onclick = () => seleccionarRespuestaExamen(q.id, l);
-    contOp.appendChild(div);
-  });
-
-  const expBox = $('explicacion-box');
-  if (respondidaDiag) {
-    expBox.classList.remove('hidden');
-    const esCorrecta = seleccionada === q.correcta;
-    expBox.innerHTML = `
-      <div class="demo-res ${esCorrecta ? 'ok' : 'no'}">
-        <strong>${esCorrecta ? '✓ ¡Respuesta Correcta!' : '✗ Respuesta Incorrecta'}</strong>
-        <p>${fmt(q.explicacion)}</p>
-      </div>`;
-  } else {
-    expBox.classList.add('hidden');
-  }
-
-  renderNavegadorNumerico();
-
-  $('btn-prev').disabled = examenActual.indice === 0;
-  const esUltima = examenActual.indice === total - 1;
-  $('btn-siguiente').classList.toggle('hidden', esUltima);
-  $('btn-finalizar').classList.toggle('hidden', !esUltima);
-
-  inyectarMarcaDeAgua();
-}
-
-function renderNavegadorNumerico() {
-  const cont = $('navegador-preguntas');
-  cont.innerHTML = '';
-  examenActual.preguntas.forEach((p, idx) => {
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-secondary';
-    btn.style.padding = '6px 12px';
-    btn.style.fontSize = '12px';
-    if (idx === examenActual.indice) btn.classList.replace('btn-secondary', 'btn-primary');
-
-    if (examenActual.respuestas[p.id]) {
-      btn.style.border = '2px solid var(--ok)';
-    }
-
-    btn.textContent = idx + 1;
-    btn.onclick = () => {
-      examenActual.indice = idx;
-      renderExamenUI();
-    };
-    cont.appendChild(btn);
-  });
-}
-
-function seleccionarRespuestaExamen(preguntaId, letra) {
-  if (!examenActual) return;
-  if (examenActual.tipo === 'diagnostico' && examenActual.feedback[preguntaId]) return;
-
-  examenActual.respuestas[preguntaId] = letra;
-
-  if (examenActual.tipo === 'diagnostico') {
-    examenActual.feedback[preguntaId] = true;
-  }
-
-  renderExamenUI();
-}
-
-function navegarPregunta(dir) {
-  if (!examenActual) return;
-  const n = examenActual.indice + dir;
-  if (n >= 0 && n < examenActual.preguntas.length) {
-    examenActual.indice = n;
-    renderExamenUI();
-  }
-}
-
-function iniciarCronometroExamen() {
-  const timerEl = $('timer');
-  timerEl.classList.remove('hidden');
-
-  if (examenActual.timer) clearInterval(examenActual.timer);
-
-  examenActual.timer = setInterval(() => {
-    if (!examenActual) return;
-    examenActual.tiempoRestante--;
-
-    timerEl.textContent = `⏱ ${formatearTiempo(examenActual.tiempoRestante)}`;
-
-    if (examenActual.tiempoRestante === 300) {
-      alert('⚠️ Te quedan 5 minutos para finalizar tu simulacro.');
-    }
-
-    if (examenActual.tiempoRestante <= 0) {
-      clearInterval(examenActual.timer);
-      alert('⏱️ El tiempo ha finalizado. Tu examen se guardará automáticamente.');
-      finalizarExamen(true);
-    }
-  }, 1000);
-}
-
-function cancelarExamen() {
-  if (confirm('¿Estás seguro de que deseas cancelar el examen actual? Tu progreso no se guardará.')) {
-    if (examenActual && examenActual.timer) clearInterval(examenActual.timer);
-    examenActual = null;
-    mostrarPantalla('pantalla-panel');
-  }
-}
-
-async function finalizarExamen(auto = false) {
-  if (!examenActual) return;
-  if (examenActual.timer) clearInterval(examenActual.timer);
-
-  const total = examenActual.preguntas.length;
-  let aciertos = 0;
-  const detalleRespuestas = [];
-
-  examenActual.preguntas.forEach(q => {
-    const resp = examenActual.respuestas[q.id] || null;
-    const esCorrecta = resp === q.correcta;
-    if (esCorrecta) aciertos++;
-
-    detalleRespuestas.push({
-      pregunta_id: q.id,
-      respuesta: resp,
-      correcta: q.correcta,
-      es_correcta: esCorrecta,
-      materia: q.materia,
-      tema: q.tema,
-      subtema: q.subtema
-    });
-  });
-
-  const puntaje = Math.round((aciertos / total) * 1000);
-  const aprobado = puntaje >= 701;
-
-  try {
-    const { data: intentoData, error: errIntento } = await obtenerSupabase().from('intentos').insert({
-      licencia_codigo: sesionActual.codigo,
-      tipo: examenActual.tipo,
-      fase: sesionActual.fase,
-      asignatura: sesionActual.asignatura,
-      puntaje: puntaje,
-      aprobado: aprobado,
-      tiempo_usado_seg: examenActual.tipo === 'simulacro' ? (165 * 60 - examenActual.tiempoRestante) : 0
-    }).select('id').single();
-
-    if (!errIntento && intentoData) {
-      const respInsert = detalleRespuestas.map(d => ({
-        intento_id: intentoData.id,
-        pregunta_id: d.pregunta_id,
-        respuesta: d.respuesta,
-        es_correcta: d.es_correcta
-      }));
-      await obtenerSupabase().from('respuestas').insert(respInsert);
-    }
-  } catch (e) {
-    console.warn('Error registrando resultados en Supabase:', e);
-  }
-
-  renderResultadosUI(puntaje, aprobado, aciertos, total, detalleRespuestas);
-  examenActual = null;
-  mostrarPantalla('pantalla-resultados');
-}
-
-function renderResultadosUI(puntaje, aprobado, aciertos, total, detalle) {
-  const resBox = $('resultado-resumen');
-  resBox.innerHTML = `
-    <h2 style="font-size:3rem; color:${aprobado ? 'var(--ok)' : 'var(--er)'}">${puntaje} / 1000</h2>
-    <h3>${aprobado ? '¡Felicitaciones! Has Aprobado' : 'Resultado Insuficiente'}</h3>
-    <p style="color:var(--mu);">${aciertos} aciertos de ${total} preguntas (${Math.round((aciertos/total)*100)}%)</p>`;
-
-  const detBox = $('resultado-detalle');
-  detBox.innerHTML = detalle.map((d, i) => `
-    <div style="border-bottom:1px solid var(--ln); padding:12px 0;">
-      <p><strong>${i + 1}. Reactivo ${esc(d.pregunta_id)} (${esc(d.materia)})</strong></p>
-      <p style="font-size:13px; color:${d.es_correcta ? 'var(--okd)' : 'var(--er)'}">
-        Tu respuesta: ${d.respuesta || 'Sin responder'} | Correcta: ${d.correcta}
-      </p>
-    </div>`).join('');
-}
-
-function inyectarMarcaDeAgua() {
-  let marca = $('marca-agua-dinamica');
-  if (!marca) {
-    marca = document.createElement('div');
-    marca.id = 'marca-agua-dinamica';
-    marca.style.position = 'fixed';
-    marca.style.top = '50%';
-    marca.style.left = '50%';
-    marca.style.transform = 'translate(-50%, -50%) rotate(-30deg)';
-    marca.style.fontSize = '24px';
-    marca.style.color = 'rgba(0,0,0,0.04)';
-    marca.style.pointerEvents = 'none';
-    marca.style.zIndex = '9999';
-    marca.style.textAlign = 'center';
-    marca.style.userSelect = 'none';
-    document.body.appendChild(marca);
-  }
-
-  if (sesionActual) {
-    marca.innerHTML = `${esc(sesionActual.codigo)}<br>${new Date().toLocaleString('es-EC')}`;
-  }
-}
-
-function iniciarAntiCopiaEvents() {
-  document.addEventListener('contextmenu', e => {
-    if (examenActual) { e.preventDefault(); registrarIncidenciaCopia('Clic derecho desactivado.'); }
-  });
-
-  document.addEventListener('copy', e => {
-    if (examenActual) { e.preventDefault(); registrarIncidenciaCopia('Copiar desactivado.'); }
-  });
-
-  document.addEventListener('keydown', e => {
-    if (examenActual && (e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'u' || e.key === 's')) {
-      e.preventDefault();
-      registrarIncidenciaCopia('Atajo bloqueado.');
-    }
-  });
-}
-
-function registrarIncidenciaCopia(motivo) {
-  if (!examenActual) return;
-  examenActual.incidencias++;
-  if (examenActual.incidencias >= 5) {
-    alert('⚠️ Se han detectado múltiples intentos de copia. Tu examen se anulará.');
-    cancelarExamen();
-  }
-}
-
-async function cargarHistorialDocente() {
-  const tbody = $('historial-lista');
-  const vacio = $('historial-vacio');
-  if (!tbody || !sesionActual) return;
-
-  tbody.innerHTML = '<tr><td colspan="6">Cargando intentos...</td></tr>';
-
-  try {
-    const { data, error } = await obtenerSupabase()
-      .from('intentos')
-      .select('*')
-      .eq('licencia_codigo', sesionActual.codigo)
-      .order('fecha', { ascending: false });
-
-    if (error || !data || !data.length) {
-      tbody.innerHTML = '';
-      if (vacio) vacio.classList.remove('hidden');
-      return;
-    }
-
-    if (vacio) vacio.classList.add('hidden');
-    tbody.innerHTML = data.map(i => `
-      <tr>
-        <td>${new Date(i.fecha).toLocaleDateString('es-EC')}</td>
-        <td>${esc(i.tipo)}</td>
-        <td>Fase ${i.fase}</td>
-        <td>${esc(i.asignatura)}</td>
-        <td><strong>${i.puntaje}</strong></td>
-        <td><span style="color:${i.aprobado ? 'var(--ok)' : 'var(--er)'}; font-weight:700;">${i.aprobado ? 'Aprobado' : 'Reprobado'}</span></td>
-      </tr>`).join('');
-  } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="6">Error al cargar historial.</td></tr>';
-  }
-}
-
-/* ---------- 11. CENTRO DE ADMINISTRACIÓN (B5) ---------- */
-function accederAdmin(e) {
-  if (e) e.preventDefault();
-  const d = $('modal-admin');
-  $('admin-clave-error').classList.add('hidden');
-  $('admin-clave-input').value = '';
-  if (!d.open) d.showModal();
-  $('admin-clave-input').focus();
-}
-
-function cerrarModalAdmin() { $('modal-admin').close(); }
-
-function mostrarErrorAdmin(msg) {
-  const err = $('admin-clave-error');
-  err.textContent = msg;
-  err.classList.remove('hidden');
-}
-
-async function adminLogin(e) {
-  e.preventDefault();
-  const clave = $('admin-clave-input').value;
-  const btn = $('btn-admin-verificar');
-  $('admin-clave-error').classList.add('hidden');
-
-  if (!clave) { mostrarErrorAdmin('Introduce la clave de administrador.'); return false; }
-  btn.disabled = true;
-  btn.textContent = 'Verificando...';
-
-  try {
-    const { data, error } = await obtenerSupabase().rpc('admin_verificar', { p_clave: clave });
-    if (error) throw error;
-    if (data === true) {
-      adminClave = clave; 
-      $('modal-admin').close();
-      mostrarPantalla('pantalla-admin');
-      cambiarTabAdmin('resumen');
-    } else {
-      mostrarErrorAdmin('Clave incorrecta.');
-    }
-  } catch (ex) {
-    console.error(ex);
-    mostrarErrorAdmin('No se pudo verificar la clave. Confirma que la función admin_verificar esté instalada.');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Verificar';
-    $('admin-clave-input').value = '';
-  }
-  return false;
-}
-
-function salirAdmin() {
-  adminClave = null;
-  mostrarPantalla('pantalla-inicio');
-}
-
-function cambiarTabAdmin(tab) {
-  document.querySelectorAll('.admin-tab').forEach(t => t.classList.toggle('activa', t.dataset.tab === tab));
-  document.querySelectorAll('.admin-seccion').forEach(s => s.classList.toggle('activa', s.id === 'admin-' + tab));
-
-  if (tab === 'crear') actualizarAsignaturasAdmin();
-  if (tab === 'usuarios') cargarUsuariosAdmin();
-  if (tab === 'resultados') cargarResultadosRecientesAdmin();
-  if (tab === 'stats') cargarStatsAdmin();
-  if (tab === 'fallos') cargarFallosAdmin();
-}
-
-function actualizarAsignaturasAdmin() {
-  const faseInput = $('admin-fase');
-  const sel = $('admin-asignatura');
-  if (!faseInput || !sel) return;
-
-  const fase = faseInput.value;
-  sel.innerHTML = '<option value="">— Seleccione asignatura —</option>';
-
-  if (!fase || !ASIGNATURAS_POR_FASE[fase]) {
-    sel.innerHTML = '<option value="">— Primero elija fase —</option>';
-    return;
-  }
-
-  ASIGNATURAS_POR_FASE[fase].forEach(a => {
-    const o = document.createElement('option');
-    o.value = a;
-    o.textContent = a;
-    sel.appendChild(o);
-  });
-}
-
-function generarUsuario(nombre) {
-  const limpio = nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z\s]/g, '').trim().split(/\s+/);
-  const base = limpio.length >= 2 ? limpio[0] + '.' + limpio[limpio.length - 1] : (limpio[0] || 'docente');
-  return base + '-' + Math.random().toString(36).substring(2, 6);
-}
-
-async function generarUsuarioAdmin() {
-  const nombre = ($('admin-nombre').value || '').trim();
-  const fase = $('admin-fase').value;
-  const asignatura = $('admin-asignatura').value;
-  const alerta = $('admin-crear-alerta');
-  if (alerta) alerta.classList.add('hidden');
-
-  if (!nombre || !fase || !asignatura) {
-    if (alerta) {
-      alerta.textContent = 'Por favor completa el nombre, la fase y la asignatura.';
-      alerta.classList.remove('hidden');
-    }
-    return;
-  }
-
-  const codigo = generarUsuario(nombre);
-  await guardarLicenciaEnSistema(codigo, nombre, fase, asignatura, false);
-}
-
-async function generarUsuarioTemporal() {
-  const nombre = ($('admin-nombre').value || '').trim();
-  const fase = $('admin-fase').value;
-  const asignatura = $('admin-asignatura').value;
-  const alerta = $('admin-crear-alerta');
-  if (alerta) alerta.classList.add('hidden');
-
-  if (!nombre || !fase || !asignatura) {
-    if (alerta) {
-      alerta.textContent = 'Para crear un acceso de demostración debes ingresar nombre, fase y asignatura.';
-      alerta.classList.remove('hidden');
-    }
-    return;
-  }
-
-  const baseNombre = nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z\s]/g, '').trim().split(/\s+/)[0] || 'demo';
-  const codigo = 'prueba-' + baseNombre + '-' + Math.random().toString(36).substring(2, 6);
-
-  await guardarLicenciaEnSistema(codigo, nombre + ' (Demo)', fase, asignatura, true);
-}
-
-async function guardarLicenciaEnSistema(codigo, cliente, fase, asignatura, esDemo) {
-  usuarioGeneradoTemp = codigo;
-
-  try {
-    const { data, error } = await obtenerSupabase().rpc('crear_licencia', {
-      p_clave: adminClave,
-      p_codigo: codigo,
-      p_cliente: cliente,
-      p_fase: parseInt(fase),
-      p_asignatura: asignatura
-    });
-
-    if (error || (data && !data.exito)) {
-      alert((data && data.mensaje) || 'Error al guardar licencia.');
-      return;
-    }
-  } catch (e) {
-    alert('Excepción al conectar con Supabase.');
-    return;
-  }
-
-  $('usuario-codigo').textContent = codigo;
-  $('codigo-generado-label').textContent = esDemo ? 'Usuario temporal de prueba:' : 'Usuario creado:';
-
-  const notaTemp = $('nota-temporal');
-  if (notaTemp) {
-    if (esDemo) notaTemp.classList.remove('hidden');
-    else notaTemp.classList.add('hidden');
-  }
-
-  $('codigo-generado').classList.add('visible');
-}
-
-function copiarUsuario() {
-  if (usuarioGeneradoTemp) {
-    navigator.clipboard.writeText(usuarioGeneradoTemp).then(() => alert('Copiado: ' + usuarioGeneradoTemp));
-  }
-}
-
-function enviarWhatsApp() {
-  if (usuarioGeneradoTemp) {
-    window.open('https://wa.me/?text=' + encodeURIComponent('Tu usuario para ApruebaDocente es:\n\n' + usuarioGeneradoTemp), '_blank');
-  }
-}
-
-async function cargarUsuariosAdmin() {
-  const tbody = $('admin-usuarios-body');
-  if (!tbody || !adminClave) return;
-  tbody.innerHTML = '<tr><td colspan="6">Cargando directorio...</td></tr>';
-
-  try {
-    const { data, error } = await obtenerSupabase().rpc('listar_usuarios', { p_clave: adminClave });
-    if (error || !data) {
-      tbody.innerHTML = '<tr><td colspan="6">Error al cargar usuarios.</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = data.map(u => `
-      <tr>
-        <td><strong>${esc(u.codigo)}</strong><br><small>${esc(u.cliente)}</small></td>
-        <td>Fase ${u.fase}</td>
-        <td>${esc(u.asignatura)}</td>
-        <td>${u.intentos_count}</td>
-        <td><span style="color:${u.activo ? 'var(--ok)' : 'var(--mu)'}; font-weight:700;">${u.activo ? '● Activa' : '○ Inactiva'}</span></td>
-        <td>
-          ${u.activo ? `<button class="btn btn-danger" style="padding:4px 8px; font-size:12px;" onclick="liberarSesionAdmin('${u.codigo}')">Liberar</button>` : '—'}
-        </td>
-      </tr>`).join('');
-  } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="6">Error de servidor.</td></tr>';
-  }
-}
-
-async function liberarSesionAdmin(codigo) {
-  if (!confirm(`¿Deseas liberar la sesión del usuario ${codigo}?`)) return;
-  try {
-    const { data } = await obtenerSupabase().rpc('liberar_sesion', { p_clave: adminClave, p_codigo: codigo });
-    if (data && data.exito) {
-      alert('Sesión liberada.');
-      cargarUsuariosAdmin();
-    }
-  } catch (e) {
-    alert('Error al liberar sesión.');
-  }
-}
-
-async function cargarResultadosRecientesAdmin() {
-  const tbody = $('admin-resultados-body');
-  if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="6">Cargando resultados...</td></tr>';
-
-  try {
-    const { data, error } = await obtenerSupabase()
-      .from('intentos')
-      .select('*')
-      .order('fecha', { ascending: false })
-      .limit(30);
-
-    if (error || !data) {
-      tbody.innerHTML = '<tr><td colspan="6">Sin datos de actividad.</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = data.map(r => `
-      <tr>
-        <td>${new Date(r.fecha).toLocaleDateString('es-EC')}</td>
-        <td>${esc(r.licencia_codigo)}</td>
-        <td>Fase ${r.fase}</td>
-        <td>${esc(r.asignatura)}</td>
-        <td><strong>${r.puntaje}</strong></td>
-        <td><span style="color:${r.aprobado ? 'var(--ok)' : 'var(--er)'}; font-weight:700;">${r.aprobado ? 'Aprobado' : 'Reprobado'}</span></td>
-      </tr>`).join('');
-  } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="6">Error al cargar resultados.</td></tr>';
-  }
-}
-
-async function cargarStatsAdmin() {
-  try {
-    const { data: intentos } = await obtenerSupabase().from('intentos').select('puntaje, aprobado, fase, asignatura');
-    if (!intentos) return;
-
-    const total = intentos.length;
-    const aprobados = intentos.filter(i => i.aprobado).length;
-    const sumaPuntaje = intentos.reduce((acc, i) => acc + i.puntaje, 0);
-    const promedio = total > 0 ? Math.round(sumaPuntaje / total) : 0;
-
-    $('stat-total').textContent = total;
-    $('stat-aprobados').textContent = aprobados;
-    $('stat-promedio').textContent = promedio;
-
-    const r1 = intentos.filter(i => i.puntaje < 500).length;
-    const r2 = intentos.filter(i => i.puntaje >= 500 && i.puntaje < 701).length;
-    const r3 = intentos.filter(i => i.puntaje >= 701 && i.puntaje < 900).length;
-    const r4 = intentos.filter(i => i.puntaje >= 900).length;
-
-    $('stats-rangos').innerHTML = `
-      <tr><td>Insuficiente (&lt; 500)</td><td>${r1}</td></tr>
-      <tr><td>En Desarrollo (500 - 700)</td><td>${r2}</td></tr>
-      <tr><td>Satisfactorio (701 - 899)</td><td>${r3}</td></tr>
-      <tr><td>Excelente (900 - 1000)</td><td>${r4}</td></tr>`;
-  } catch (e) {}
-}
-
-async function cargarFallosAdmin() {
-  const tbody = $('admin-fallos-body');
-  if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="4">Cargando métricas...</td></tr>';
-
-  try {
-    const { data, error } = await obtenerSupabase().from('preguntas_stats').select('*').order('veces_fallada', { ascending: false }).limit(20);
-    if (error || !data || !data.length) {
-      tbody.innerHTML = '<tr><td colspan="4">No hay datos de preguntas falladas.</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = data.map(f => `
-      <tr>
-        <td><strong>${esc(f.pregunta_id)}</strong></td>
-        <td>Fase ${f.fase || 1}</td>
-        <td>${esc(f.tema || 'General')} <br><small style="color:var(--mu);">${esc(f.subtema || '')}</small></td>
-        <td><strong style="color:var(--er);">${f.veces_fallada}</strong></td>
-      </tr>`).join('');
-  } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="4">Error cargando fallos.</td></tr>';
-  }
-}
+/* Llamada por los botones del panel: iniciarExamen('diagnostico' | 'simulacro') */
