@@ -3,7 +3,6 @@
    anti-copia, finalizar/guardar, resultados e historial del docente.
    Depende de app.js (sesionActual, cargarBanco, armarIntegral, esPermitida).
    ===================================================================== */
-/* NOTA: iniciarExamen y armarIntegral viven en app.js. NO redefinirlas aquí. */
 
 /* ---------- 10. PANTALLA EXAMEN, ANTI-COPIA & RESULTADOS (B4) ---------- */
 function renderExamenUI() {
@@ -20,7 +19,9 @@ function renderExamenUI() {
   const contOp = $('opciones-container');
   contOp.innerHTML = '';
   const seleccionada = examenActual.respuestas[q.id];
-  const respondidaDiag = examenActual.tipo === 'diagnostico' && examenActual.feedback[q.id];
+  // fb = respuesta del servidor {listo, correcta, es_correcta, explicacion} (solo diagnóstico)
+  const fb = examenActual.tipo === 'diagnostico' ? examenActual.feedback[q.id] : null;
+  const respondidaDiag = !!(fb && fb.listo);
 
   LETRAS.forEach(l => {
     const div = document.createElement('div');
@@ -28,7 +29,7 @@ function renderExamenUI() {
     if (seleccionada === l) div.classList.add('s');
 
     if (respondidaDiag) {
-      if (l === q.correcta) div.classList.add('s');
+      if (l === fb.correcta) div.classList.add('s');
       else if (seleccionada === l) div.classList.add('x');
     }
 
@@ -40,11 +41,10 @@ function renderExamenUI() {
   const expBox = $('explicacion-box');
   if (respondidaDiag) {
     expBox.classList.remove('hidden');
-    const esCorrecta = seleccionada === q.correcta;
     expBox.innerHTML = `
-      <div class="demo-res ${esCorrecta ? 'ok' : 'no'}">
-        <strong>${esCorrecta ? '✓ ¡Respuesta Correcta!' : '✗ Respuesta Incorrecta'}</strong>
-        <p>${fmt(q.explicacion)}</p>
+      <div class="demo-res ${fb.es_correcta ? 'ok' : 'no'}">
+        <strong>${fb.es_correcta ? '✓ ¡Respuesta Correcta!' : '✗ Respuesta Incorrecta'}</strong>
+        <p>${fmt(fb.explicacion)}</p>
       </div>`;
   } else {
     expBox.classList.add('hidden');
@@ -83,16 +83,38 @@ function renderNavegadorNumerico() {
   });
 }
 
-function seleccionarRespuestaExamen(preguntaId, letra) {
+async function seleccionarRespuestaExamen(preguntaId, letra) {
   if (!examenActual) return;
-  if (examenActual.tipo === 'diagnostico' && examenActual.feedback[preguntaId]) return;
+  const ex = examenActual;
 
-  examenActual.respuestas[preguntaId] = letra;
-
-  if (examenActual.tipo === 'diagnostico') {
-    examenActual.feedback[preguntaId] = true;
+  if (ex.tipo === 'diagnostico') {
+    if (ex.feedback[preguntaId]) return;            // ya respondida o verificándose
+    ex.feedback[preguntaId] = { listo: false };     // bloquea doble clic mientras responde el servidor
+    try {
+      const { data, error } = await obtenerSupabase().rpc('verificar_respuesta', {
+        p_id: preguntaId,
+        p_letra: letra,
+        p_codigo: sesionActual.codigo,
+        p_token: sesionActual.token
+      });
+      if (error) throw error;
+      ex.respuestas[preguntaId] = letra;
+      ex.feedback[preguntaId] = {
+        listo: true,
+        correcta: data.correcta,
+        es_correcta: data.es_correcta,
+        explicacion: data.explicacion
+      };
+    } catch (e) {
+      console.error(e);
+      delete ex.feedback[preguntaId];
+      alert('No se pudo verificar la respuesta. Revisa tu conexión e intenta de nuevo.');
+    }
+    if (examenActual === ex) renderExamenUI();
+    return;
   }
 
+  ex.respuestas[preguntaId] = letra;
   renderExamenUI();
 }
 
@@ -130,67 +152,48 @@ function iniciarCronometroExamen() {
 }
 
 function cancelarExamen() {
-  if (confirm('¿Estás seguro de que deseas cancelar el examen actual? Tu progreso no se guardará.')) {
-    if (examenActual && examenActual.timer) clearInterval(examenActual.timer);
-    examenActual = null;
-    mostrarPantalla('pantalla-panel');
+  if (!examenActual) return;
+  
+  const msg = '¿Seguro que deseas salir del examen?\n\nSe guardará tu calificación SOLO con las preguntas que has respondido hasta ahora. Las que dejaste en blanco contarán como incorrectas.';
+  
+  if (confirm(msg)) {
+    // En lugar de borrar todo, forzamos a que termine y guarde el examen
+    finalizarExamen(true); 
   }
 }
 
 async function finalizarExamen(auto = false) {
   if (!examenActual) return;
-  if (examenActual.timer) clearInterval(examenActual.timer);
+  const ex = examenActual;
+  if (ex.enviando) return;                          // evita doble envío
+  ex.enviando = true;
+  if (ex.timer) clearInterval(ex.timer);
 
-  const total = examenActual.preguntas.length;
-  let aciertos = 0;
-  const detalleRespuestas = [];
-
-  examenActual.preguntas.forEach(q => {
-    const resp = examenActual.respuestas[q.id] || null;
-    const esCorrecta = resp === q.correcta;
-    if (esCorrecta) aciertos++;
-
-    detalleRespuestas.push({
-      pregunta_id: q.id,
-      respuesta: resp,
-      correcta: q.correcta,
-      es_correcta: esCorrecta,
-      materia: q.materia,
-      tema: q.tema,
-      subtema: q.subtema
-    });
-  });
-
-  const puntaje = Math.round((aciertos / total) * 1000);
-  const aprobado = puntaje >= 701;
+  const tiempoUsado = ex.tipo === 'simulacro'
+    ? Math.max(0, 165 * 60 - ex.tiempoRestante)
+    : 0;
 
   try {
-    const { data: intentoData, error: errIntento } = await obtenerSupabase().from('intentos').insert({
-      licencia_codigo: sesionActual.codigo,
-      tipo: examenActual.tipo,
-      fase: sesionActual.fase,
-      asignatura: sesionActual.asignatura,
-      puntaje: puntaje,
-      aprobado: aprobado,
-      tiempo_usado_seg: examenActual.tipo === 'simulacro' ? (165 * 60 - examenActual.tiempoRestante) : 0
-    }).select('id').single();
+    // El servidor califica (la clave nunca llega al navegador) y guarda intento + respuestas
+    const { data, error } = await obtenerSupabase().rpc('calificar_examen', {
+      p_codigo: sesionActual.codigo,
+      p_token: sesionActual.token,
+      p_tipo: ex.tipo,
+      p_ids: ex.preguntas.map(q => q.id),
+      p_respuestas: ex.respuestas,
+      p_tiempo_usado_seg: tiempoUsado
+    });
+    if (error) throw error;
 
-    if (!errIntento && intentoData) {
-      const respInsert = detalleRespuestas.map(d => ({
-        intento_id: intentoData.id,
-        pregunta_id: d.pregunta_id,
-        respuesta: d.respuesta,
-        es_correcta: d.es_correcta
-      }));
-      await obtenerSupabase().from('respuestas').insert(respInsert);
-    }
+    examenActual = null;
+    renderResultadosUI(data.puntaje, data.aprobado, data.aciertos, data.total, data.detalle);
+    mostrarPantalla('pantalla-resultados');
   } catch (e) {
-    console.warn('Error registrando resultados en Supabase:', e);
+    console.error('❌ ERROR AL CALIFICAR/GUARDAR EL EXAMEN:', e);
+    ex.enviando = false;
+    alert('No se pudo calificar y guardar tu examen: ' + (e.message || e) +
+      '\n\nTus respuestas siguen en pantalla. Ve a la última pregunta y pulsa «Finalizar» para reintentar.');
   }
-
-  renderResultadosUI(puntaje, aprobado, aciertos, total, detalleRespuestas);
-  examenActual = null;
-  mostrarPantalla('pantalla-resultados');
 }
 
 function renderResultadosUI(puntaje, aprobado, aciertos, total, detalle) {
