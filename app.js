@@ -1,12 +1,19 @@
 /* =====================================================================
    app.js · NÚCLEO: constantes, estado, utilidades, Supabase, navegación,
-   login/sesión, panel docente y carga de los JSON del banco (por fase).
-   Carga: config.js → app.js → examen.js → admin.js
+   login/sesión, panel docente, banco de preguntas (por fase) y armado
+   del examen (iniciarExamen / armarIntegral).
+
+   Orden de carga en index.html:
+   supabase-js (CDN) → config.js → app.js → examen.js → admin.js
+
+   IMPORTANTE: iniciarExamen y armarIntegral viven SOLO aquí.
+   examen.js NO debe volver a definirlas (si lo hace, pisa a esta versión).
    ===================================================================== */
-/* =====================================================================
-   ApruebaDocente · Código Completo (app.js)
-   Integración funcional de B1, B2, B3, B4 y B5.
-   ===================================================================== */
+
+/* Versión del código: se imprime en consola para comprobar que el navegador
+   cargó este archivo y no una copia vieja en caché. Súbela cuando edites. */
+const APP_VERSION = '2026.11.10-1';
+console.info('[ApruebaDocente] app.js versión', APP_VERSION);
 
 /* ---------- 1. CONSTANTES & CONFIGURACIÓN ---------- */
 const ASIGNATURAS_POR_FASE = {
@@ -42,30 +49,22 @@ const ASIGNATURAS_POR_FASE = {
 
 const LETRAS = ['A', 'B', 'C', 'D'];
 
-const LEGAL = {
-  terminos: {
-    titulo: 'Términos y condiciones',
-    secciones: [
-      ['1. Objeto del servicio', 'Descripción del servicio de práctica para la EVDO que ofrece ApruebaDocente.'],
-      ['2. Licencia de uso', 'La licencia es personal e intransferible y habilita una fase y una asignatura.'],
-      ['3. Sesión única', 'Cada licencia permite una sola sesión activa a la vez.'],
-      ['4. Uso honesto del contenido', 'Prohibición de copiar, redistribuir o publicar el banco de preguntas.'],
-      ['5. Vigencia', 'Duración de la licencia y condiciones de vencimiento (3 meses desde la creación).'],
-      ['6. Independencia', 'ApruebaDocente no está afiliado ni representa al INEVAL o al Ministerio de Educación.'],
-      ['7. Contacto', 'Canal de atención por WhatsApp.']
-    ]
-  },
-  privacidad: {
-    titulo: 'Política de privacidad',
-    secciones: [
-      ['1. Datos registrados', 'Identificador de la licencia, fase, asignatura y métricas de desempeño.'],
-      ['2. Finalidad', 'Seguimiento pedagógico, control de sesión única por dispositivo y optimización de preguntas.'],
-      ['3. Almacenamiento', 'Infraestructura cloud con políticas RLS activas.'],
-      ['4. Derechos del usuario', 'Acceso, consulta y eliminación de registros de intentos.'],
-      ['5. Contacto', 'Canal directo para consultas de privacidad.']
-    ]
-  }
+/* Composición oficial de cada examen (INEVAL).
+   Diagnóstico: 25 + 12 + 13 = 50 | Simulacro: 60 + 21 + 18 = 99 */
+// [NUEVO · TAREA 3] Versión de los textos legales aceptados. Súbela cada vez que cambie legales.js.
+const CONSENT_VERSION = '2026-11-10';
+
+// [NUEVO · TAREA 3] Prefijo de los códigos de demostración (1 hora de vigencia). Debe coincidir con es_codigo_demo() en SQL.
+const DEMO_PREFIJO = 'prueba-';
+
+const EXAMEN_CONFIG = {
+  diagnostico: { esp: 25, ped: 12, dig: 13 },
+  simulacro:   { esp: 60, ped: 21, dig: 18 }
 };
+
+// [NUEVO · TAREA 3] Los textos legales (LEGAL, LEGAL_RESP) viven en legales.js.
+// Se eliminó aquí el "const LEGAL" duplicado: con ambos cargados el navegador
+// lanza "Identifier 'LEGAL' has already been declared" y app.js no arranca.
 
 /* ---------- 2. ESTADO GLOBAL ---------- */
 let supabaseClient = null;
@@ -81,9 +80,8 @@ let demoActual = null;
 let demoUltimoId = null;
 let demoRespondida = false;
 
-// Examen Activo
-let examenActual = null; 
-
+// Examen activo (lo usa examen.js)
+let examenActual = null;
 
 /* ---------- 3. UTILIDADES GENERALES ---------- */
 function $(id) { return document.getElementById(id); }
@@ -113,7 +111,7 @@ function formatearTiempo(segundos) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-/* ---------- 4. SUPABASE INICIALIZACIÓN ---------- */
+/* ---------- 4. SUPABASE ---------- */
 function iniciarSupabase() {
   try {
     const urlOk = typeof SUPABASE_URL === 'string' && /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(SUPABASE_URL);
@@ -142,7 +140,7 @@ function obtenerSupabase() {
   return supabaseClient;
 }
 
-/* ---------- 5. NAVEGACIÓN Y PANTALLAS ---------- */
+/* ---------- 5. NAVEGACIÓN Y ARRANQUE ---------- */
 function mostrarPantalla(id) {
   const destino = $(id);
   if (!destino) return;
@@ -150,12 +148,22 @@ function mostrarPantalla(id) {
   document.querySelectorAll('.pantalla').forEach(p => p.classList.toggle('activa', p === destino));
   window.scrollTo(0, 0);
 
+  if (id === 'pantalla-login') actualizarEstadoBotonesLogin();   // [NUEVO · TAREA 3]
   if (id === 'pantalla-panel') actualizarPanelDocenteUI();
-  if (id === 'pantalla-historial') cargarHistorialDocente();
+  if (id === 'pantalla-historial') cargarHistorialDocente();   // definida en examen.js
 }
 
 function init() {
   iniciarSupabase();
+
+  // [NUEVO · TAREA 3] Consentimiento: estado inicial del botón y listeners de los checkboxes
+  actualizarEstadoBotonesLogin();
+  ['consent-terminos', 'consent-privacidad'].forEach(id => {
+    const cb = $(id);
+    if (cb) cb.addEventListener('change', actualizarEstadoBotonesLogin);
+  });
+  // [NUEVO · TAREA 4] Banner de cookies informativas
+  mostrarBannerCookiesSiCorresponde();
 
   ['modal-admin', 'modal-legal'].forEach(id => {
     const d = $(id);
@@ -172,19 +180,16 @@ function init() {
   }
 
   const inputLic = $('input-licencia');
-  if (inputLic) {
-    inputLic.addEventListener('input', evaluarInputLoginEVDO);
-  }
+  if (inputLic) inputLic.addEventListener('input', evaluarInputLoginEVDO);
 
-  iniciarAntiCopiaEvents();
+  iniciarAntiCopiaEvents();   // definida en examen.js
   verificarSesionLocal();
 }
 
 document.addEventListener('DOMContentLoaded', init);
 
 /* ---------- 6. BANCO DE PREGUNTAS (./data/*.json) ---------- */
-/* Cada archivo JSON se asocia a su materia/asignatura. Los nombres deben coincidir
-   EXACTAMENTE con los archivos de la carpeta data/. */
+/* Los nombres de archivo deben coincidir EXACTAMENTE con los de la carpeta data/. */
 const BANCO_JSON = [
   { fase: 1, archivo: 'EVDO 2026 Digitales 350 Reactivos',   materia: 'Digitales',   asignatura: 'General' },
   { fase: 1, archivo: 'EVDO 2026 Pedagogicos 350 Reactivos', materia: 'Pedagógicos', asignatura: 'General' },
@@ -199,8 +204,7 @@ const BANCO_JSON = [
   { fase: 1, archivo: 'EVDO 2026 Ciudadania 350 Reactivos',  materia: 'Específica',  asignatura: 'BGU Educación para la Ciudadanía' }
 ];
 
-/* MAPEADOR de asignaturas: compara sin tildes, sin mayúsculas, sin signos (º, °, espacios)
-   y sin el rango entre paréntesis. "EGB Básica Media y Elemental (2.º a 7.º)" == "EGB Basica Media y Elemental". */
+/* Compara asignaturas sin tildes, mayúsculas, signos (º, °) ni el rango entre paréntesis. */
 function claveAsignatura(s) {
   return String(s == null ? '' : s)
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -210,16 +214,31 @@ function claveAsignatura(s) {
     .trim();
 }
 
+/* Categoría de una pregunta: 'DIG' | 'PED' | 'ESP'.
+   1) Se identifica por el prefijo del ID (DIG- / PED-).
+   2) Si el ID no trae prefijo, se usa la materia del archivo en BANCO_JSON.
+   3) Todo lo demás es de la asignatura (ESP). */
+function categoriaDePregunta(id, def) {
+  const pref = String(id || '').toUpperCase();
+  if (pref.startsWith('DIG-')) return 'DIG';
+  if (pref.startsWith('PED-')) return 'PED';
+  if (def && def.materia === 'Digitales') return 'DIG';
+  if (def && def.materia === 'Pedagógicos') return 'PED';
+  return 'ESP';
+}
+
 const cacheBanco = {}; // archivo → preguntas ya convertidas
 
-/* Convierte {id, materia, pregunta, opciones:[{letra,texto}], clave, argumento}
-   al formato interno {opciones:{A,B,C,D}, correcta, explicacion, ...} */
+/* {id, materia, pregunta, opciones:[{letra,texto}], clave, argumento}
+   → formato interno {opciones:{A,B,C,D}, correcta, explicacion, categoria, ...} */
 function convertirPregunta(q, def, indice) {
   const opciones = {};
   (Array.isArray(q.opciones) ? q.opciones : []).forEach(op => { opciones[op.letra] = op.texto; });
+  const id = q.id || `${def.archivo}-${indice + 1}`;
   return {
-    id: q.id || `${def.archivo}-${indice + 1}`,
+    id: id,
     fase: def.fase,
+    categoria: categoriaDePregunta(id, def),
     materia: def.materia,
     asignatura: def.asignatura,
     tema: q.tema || (def.asignatura === 'General' ? def.materia : def.asignatura),
@@ -231,27 +250,31 @@ function convertirPregunta(q, def, indice) {
   };
 }
 
+function esPreguntaValida(q) {
+  if (!q || !q.pregunta || !q.opciones || typeof q.opciones !== 'object') return false;
+  if (LETRAS.indexOf(q.correcta) === -1) return false;
+  return LETRAS.every(l => typeof q.opciones[l] === 'string' && q.opciones[l].length > 0);
+}
+
 async function cargarArchivoBanco(def) {
   if (cacheBanco[def.archivo]) return cacheBanco[def.archivo];
-  const url = './data/' + encodeURIComponent(def.archivo) + '.json';
-  const resp = await fetch(url);
+  // ?v= + no-cache: evita que el navegador sirva un JSON viejo
+  const url = './data/' + encodeURIComponent(def.archivo) + '.json?v=' + APP_VERSION;
+  const resp = await fetch(url, { cache: 'no-cache' });
   if (!resp.ok) throw new Error(`${def.archivo}.json (HTTP ${resp.status})`);
   const datos = await resp.json();
   if (!Array.isArray(datos)) throw new Error(`${def.archivo}.json no es una lista de preguntas`);
   const convertidas = datos.map((q, i) => convertirPregunta(q, def, i));
   const invalidas = convertidas.filter(q => !esPreguntaValida(q)).length;
   if (invalidas) {
-    console.warn(`${def.archivo}.json: ${invalidas} de ${convertidas.length} preguntas sin clave de respuesta u opciones válidas (se descartan).`);
+    console.warn(`${def.archivo}.json: ${invalidas} de ${convertidas.length} preguntas sin clave u opciones válidas (se descartan).`);
   }
   cacheBanco[def.archivo] = convertidas;
   return cacheBanco[def.archivo];
 }
 
-/* FILTRO POR FASE: solo se descargan los archivos de la fase del docente.
-   - cargarBanco(fase)             → solo Digitales de esa fase (demo de la landing)
-   - cargarBanco(fase, asignatura) → Digitales + Pedagógicos + archivos de su asignatura
-   Si la fase no tiene archivos para esa asignatura (fases 2-4 hoy) → lanza
-   "Sin preguntas disponibles aún" y NO descarga nada. */
+/* cargarBanco(fase)             → solo Digitales de esa fase (demo de la landing)
+   cargarBanco(fase, asignatura) → Digitales + Pedagógicos + archivos de su asignatura */
 async function cargarBanco(fase, asignatura = null) {
   const deLaFase = BANCO_JSON.filter(d => d.fase === Number(fase));
   if (!deLaFase.length) {
@@ -259,7 +282,9 @@ async function cargarBanco(fase, asignatura = null) {
   }
   const claveDocente = claveAsignatura(asignatura);
   const defs = deLaFase.filter(d =>
-    asignatura ? (d.asignatura === 'General' || claveAsignatura(d.asignatura) === claveDocente) : d.materia === 'Digitales'
+    asignatura
+      ? (d.asignatura === 'General' || claveAsignatura(d.asignatura) === claveDocente)
+      : d.materia === 'Digitales'
   );
   if (asignatura && !defs.some(d => d.asignatura !== 'General')) {
     console.error('Asignatura de la licencia no reconocida:', JSON.stringify(asignatura));
@@ -282,12 +307,6 @@ async function cargarBanco(fase, asignatura = null) {
     banco.push(q);
   }));
   return banco;
-}
-
-function esPreguntaValida(q) {
-  if (!q || !q.pregunta || !q.opciones || typeof q.opciones !== 'object') return false;
-  if (LETRAS.indexOf(q.correcta) === -1) return false;
-  return LETRAS.every(l => typeof q.opciones[l] === 'string' && q.opciones[l].length > 0);
 }
 
 /* ---------- 7. LANDING: DEMO ---------- */
@@ -356,14 +375,156 @@ function abrirLegal(tipo) {
   if (!doc) return;
   $('legal-titulo').textContent = doc.titulo;
   $('legal-cuerpo').innerHTML = doc.secciones
-    .map(s => `<h3>${esc(s[0])}</h3><p>${esc(s[1])}</p>`).join('');
+    .map(s => `<h3>${esc(s[0])}</h3><p>${fmt(s[1])}</p>`).join('');
   const d = $('modal-legal');
   if (!d.open) d.showModal();
 }
 
 function cerrarLegal() { $('modal-legal').close(); }
 
-/* ---------- 8. AUTENTICACIÓN Y SESIÓN (B2) ---------- */
+/* ---------- 7B. CONSENTIMIENTO INFORMADO Y COOKIES ---------- */
+
+// [NUEVO · TAREA 3] Formatea una fecha ISO como DD/MM/AAAA (también la usa admin.js).
+function formatearFechaDDMMAAAA(iso) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+}
+
+// [NUEVO · TAREA 3] Formatea una fecha ISO como DD/MM/AAAA HH:mm (también la usa admin.js).
+function formatearFechaHoraDDMMAAAA(iso) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return formatearFechaDDMMAAAA(iso) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+// [NUEVO · TAREA 3] Tiempo restante legible: "3 meses", "45 días", "2 días", "5 horas", "23 minutos" o "Vencida".
+function formatearVencimiento(segundos) {
+  const s = Number(segundos) || 0;
+  if (s <= 0) return 'Vencida';
+  const dias = Math.floor(s / 86400);
+  if (dias >= 60) { const m = Math.round(dias / 30); return m + ' meses'; }
+  if (dias >= 1) return dias + (dias === 1 ? ' día' : ' días');
+  const horas = Math.floor(s / 3600);
+  if (horas >= 1) return horas + (horas === 1 ? ' hora' : ' horas');
+  const min = Math.max(1, Math.floor(s / 60));
+  return min + (min === 1 ? ' minuto' : ' minutos');
+}
+
+// [NUEVO · TAREA 3] Devuelve el objeto guardado en localStorage 'evdo_consentimiento' o null.
+function leerConsentimientoLocal() {
+  try {
+    const raw = localStorage.getItem('evdo_consentimiento');
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// [NUEVO · TAREA 3] Guarda el consentimiento local: {aceptado, fecha, version, terminos, privacidad, cookies}.
+function guardarConsentimientoLocal(obj) {
+  const registro = Object.assign({
+    aceptado: true,
+    fecha: new Date().toISOString(),
+    version: CONSENT_VERSION,
+    terminos: true,
+    privacidad: true,
+    cookies: true
+  }, obj || {});
+  try {
+    localStorage.setItem('evdo_consentimiento', JSON.stringify(registro));
+  } catch (e) {
+    console.warn('No se pudo guardar el consentimiento local:', e);
+  }
+}
+
+// [NUEVO · TAREA 3] true si hay consentimiento local aceptado de la versión vigente.
+function consentimientoVigente() {
+  const c = leerConsentimientoLocal();
+  return !!(c && c.aceptado === true && c.version === CONSENT_VERSION);
+}
+
+// [NUEVO · TAREA 3] Sincroniza checkboxes, nota "Aceptado el..." y botón de ingreso.
+function actualizarEstadoBotonesLogin() {
+  const btn = $('btn-entrar');
+  const cbT = $('consent-terminos');
+  const cbP = $('consent-privacidad');
+  const nota = $('consent-aceptado-nota');
+  if (!btn || !cbT || !cbP) return;
+
+  const vigente = consentimientoVigente();
+  if (vigente) {
+    const c = leerConsentimientoLocal();
+    cbT.checked = true;
+    cbP.checked = true;
+    cbT.disabled = true;
+    cbP.disabled = true;
+    if (nota) {
+      nota.textContent = '✓ Aceptado el ' + formatearFechaDDMMAAAA(c.fecha) + ' · versión ' + c.version;
+      nota.classList.remove('hidden');
+    }
+  } else {
+    cbT.disabled = false;
+    cbP.disabled = false;
+    if (nota) nota.classList.add('hidden');
+  }
+  btn.disabled = !(vigente || (cbT.checked && cbP.checked));
+}
+
+// [NUEVO · TAREA 3] Prueba server-side del consentimiento. Si falla, NO bloquea el login.
+async function registrarConsentimientoServidor(codigo, userAgent) {
+  try {
+    const { data, error } = await obtenerSupabase().rpc('registrar_consentimiento', {
+      p_codigo: codigo,
+      p_terminos: true,
+      p_privacidad: true,
+      p_cookies: true,
+      p_version: CONSENT_VERSION,
+      p_user_agent: userAgent || navigator.userAgent
+    });
+    if (error) throw error;
+    if (data && data.exito === false) console.warn('Consentimiento no registrado en el servidor:', data.mensaje);
+  } catch (e) {
+    console.warn('No se pudo registrar el consentimiento en el servidor:', e);
+  }
+}
+
+// [NUEVO · TAREA 4] Reserva espacio al botón de WhatsApp según la altura real del banner.
+function ajustarAlturaBannerCookies() {
+  const b = $('cookie-banner');
+  if (!b || b.hidden) return;
+  document.documentElement.style.setProperty('--banner-h', b.offsetHeight + 'px');
+}
+
+// [NUEVO · TAREA 4] Muestra el banner de cookies informativas solo si aún no se aceptó.
+function mostrarBannerCookiesSiCorresponde() {
+  const b = $('cookie-banner');
+  if (!b) return;
+  let aceptadas = false;
+  try { aceptadas = localStorage.getItem('evdo_cookies_aceptadas') === 'true'; } catch (_) {}
+  if (aceptadas) { b.hidden = true; return; }
+
+  b.hidden = false;
+  window.addEventListener('resize', ajustarAlturaBannerCookies);
+  requestAnimationFrame(() => {
+    ajustarAlturaBannerCookies();
+    document.body.classList.add('banner-visible');
+    b.classList.add('visible');
+  });
+}
+
+// [NUEVO · TAREA 4] Botón "Aceptar" del banner: guarda la preferencia y lo oculta con transición.
+function aceptarCookies() {
+  try { localStorage.setItem('evdo_cookies_aceptadas', 'true'); } catch (_) {}
+  const b = $('cookie-banner');
+  if (!b) return;
+  b.classList.remove('visible');
+  document.body.classList.remove('banner-visible');
+  window.removeEventListener('resize', ajustarAlturaBannerCookies);
+  setTimeout(() => { b.hidden = true; }, 300);
+}
+
+/* ---------- 8. AUTENTICACIÓN Y SESIÓN ---------- */
 function validarEVDOFormat(codigo) {
   const regex = /^EVDO-([A-Z0-9]{6})-([A-Z0-9]{2})$/i;
   const match = codigo.trim().match(regex);
@@ -436,6 +597,18 @@ async function iniciarSesion() {
     return;
   }
 
+  // [NUEVO · TAREA 3] Consentimiento previo y obligatorio
+  if (!consentimientoVigente()) {
+    const aceptaT = $('consent-terminos') && $('consent-terminos').checked;
+    const aceptaP = $('consent-privacidad') && $('consent-privacidad').checked;
+    if (!aceptaT || !aceptaP) {
+      errDiv.textContent = 'Debes aceptar los Términos y la Política de privacidad para continuar.';
+      errDiv.classList.remove('hidden');
+      return;
+    }
+    guardarConsentimientoLocal();
+  }
+
   const esEVDO = validarEVDOFormat(codigo);
   let faseEvdo = null;
   let asigEvdo = null;
@@ -479,6 +652,11 @@ async function iniciarSesion() {
     iniciarRenovacionPeriodica();
     mostrarPantalla('pantalla-panel');
 
+    // [NUEVO · TAREA 3] Constancia server-side del consentimiento (no rompe el flujo si falla)
+    try {
+      await registrarConsentimientoServidor(data.codigo);
+    } catch (_) {}
+
   } catch (e) {
     console.error(e);
     errDiv.textContent = 'Error de conexión con el servidor de autenticación.';
@@ -499,6 +677,15 @@ async function verificarSesionLocal() {
 
     if (error || !data.exito) {
       cerrarSesionLocalSilencioso();
+      // [NUEVO · TAREA 3] Si la sesión cayó por vencimiento de la licencia, avisar en el login
+      if (data && /venci/i.test(data.mensaje || '')) {
+        const errLogin = $('login-error');
+        if (errLogin) {
+          errLogin.textContent = data.mensaje;
+          errLogin.classList.remove('hidden');
+        }
+        mostrarPantalla('pantalla-login');
+      }
       return;
     }
 
@@ -524,7 +711,7 @@ function iniciarRenovacionPeriodica() {
         cerrarSesion();
       }
     } catch (_) {}
-  }, 5 * 60 * 1000); 
+  }, 5 * 60 * 1000);
 }
 
 async function cerrarSesion() {
@@ -546,7 +733,7 @@ function cerrarSesionLocalSilencioso() {
   localStorage.removeItem('evdo_sesion_activa');
 }
 
-/* ---------- 9. PANEL DOCENTE & ARMADO DEL EXAMEN (filtro por fase/asignatura) ---------- */
+/* ---------- 9. PANEL DOCENTE Y ARMADO DEL EXAMEN ---------- */
 function actualizarPanelDocenteUI() {
   if (!sesionActual) return;
 
@@ -577,24 +764,80 @@ function actualizarPanelDocenteUI() {
     if (btnSim) btnSim.disabled = false;
     if (alertaFase) alertaFase.classList.add('hidden');
   }
+
+  actualizarBannerVencimiento();   // [NUEVO · TAREA 3]
 }
 
-/* Doble candado (motor): solo fase del docente + su asignatura + Digitales/Pedagógicos */
+// [NUEVO · TAREA 3] Banner de vigencia en el panel docente (la validación real es del servidor).
+let timerVencimiento = null;
+
+async function refrescarBannerVencimiento() {
+  const box = $('panel-vencimiento');
+  if (!box || !sesionActual) return;
+  try {
+    const { data, error } = await obtenerSupabase().rpc('consultar_vencimiento', { p_codigo: sesionActual.codigo });
+    if (error || !data) return;
+
+    const seg = Number(data.segundos_restantes) || 0;
+    let texto = '';
+    let clase = '';
+
+    if (data.vencida) {
+      texto = 'Tu licencia venció. Contacta al administrador para renovarla.';
+      clase = 'banner-peligro';
+      ['btn-iniciar-diag', 'btn-iniciar-sim'].forEach(id => { const b = $(id); if (b) b.disabled = true; });
+    } else if (data.es_demo && seg <= 600) {
+      texto = 'Acceso de prueba vence en ' + formatearVencimiento(seg) + '. Crea una licencia real para continuar.';
+      clase = 'banner-aviso';
+    } else if (seg <= 7 * 24 * 3600) {
+      texto = 'Tu licencia vence en ' + formatearVencimiento(seg) + '. Contacta al administrador.';
+      clase = 'banner-aviso';
+    }
+
+    if (!texto) {
+      box.className = 'hidden';
+      box.textContent = '';
+      return;
+    }
+    box.className = clase;
+    box.textContent = texto;
+  } catch (_) {}
+}
+
+function actualizarBannerVencimiento() {
+  refrescarBannerVencimiento();
+  if (!timerVencimiento) {
+    timerVencimiento = setInterval(() => {
+      if (!sesionActual) { clearInterval(timerVencimiento); timerVencimiento = null; return; }
+      refrescarBannerVencimiento();
+    }, 60000);
+  }
+}
+
+/* Candado: solo la fase del docente + su asignatura + preguntas generales (Digitales/Pedagógicos). */
 function esPermitida(q, fase, asignatura) {
   if (!q || q.fase !== Number(fase)) return false;
-  if (q.asignatura === 'General') return q.materia === 'Digitales' || q.materia === 'Pedagógicos';
+  if (q.asignatura === 'General') return true;
   return claveAsignatura(q.asignatura) === claveAsignatura(asignatura);
 }
 
-/* Arma el examen integral. Sin "salvavidas": si falta una categoría, lanza error. */
+/* Arma el examen integral. Sin "salvavidas": si falta una categoría, lanza error.
+   La categoría (DIG / PED / ESP) se determina por el ID de la pregunta. */
 function armarIntegral(banco, fase, asignatura, nEsp, nPed, nDig) {
   const pool = banco.filter(q => esPermitida(q, fase, asignatura) && esPreguntaValida(q));
-  const espP = pool.filter(q => q.asignatura !== 'General');
-  const pedP = pool.filter(q => q.materia === 'Pedagógicos');
-  const digP = pool.filter(q => q.materia === 'Digitales');
+
+  const digP = pool.filter(q => q.categoria === 'DIG');
+  const pedP = pool.filter(q => q.categoria === 'PED');
+  const espP = pool.filter(q => q.categoria === 'ESP');
+
   if (espP.length < nEsp || pedP.length < nPed || digP.length < nDig) {
-    throw new Error(`Faltan preguntas válidas para armar el examen (disponibles/necesarias → asignatura: ${espP.length}/${nEsp}, Pedagógicos: ${pedP.length}/${nPed}, Digitales: ${digP.length}/${nDig}). Revisa que los JSON tengan la clave de respuesta (campo "clave").`);
+    throw new Error(
+      `Faltan preguntas válidas para armar el examen (disponibles/necesarias → ` +
+      `asignatura: ${espP.length}/${nEsp}, Pedagógicos: ${pedP.length}/${nPed}, Digitales: ${digP.length}/${nDig}). ` +
+      `Revisa que los JSON tengan el campo "clave" y que los IDs usen los prefijos DIG- y PED-.`
+    );
   }
+
   return barajar([
     ...barajar(espP).slice(0, nEsp),
     ...barajar(pedP).slice(0, nPed),
@@ -603,3 +846,73 @@ function armarIntegral(banco, fase, asignatura, nEsp, nPed, nDig) {
 }
 
 /* Llamada por los botones del panel: iniciarExamen('diagnostico' | 'simulacro') */
+async function iniciarExamen(tipo) {
+  if (!sesionActual) { mostrarPantalla('pantalla-login'); return; }
+  if (examenActual) return;
+
+  const esSim = tipo === 'simulacro';
+  const cfg = esSim ? EXAMEN_CONFIG.simulacro : EXAMEN_CONFIG.diagnostico;
+  const totalEsperado = cfg.esp + cfg.ped + cfg.dig;
+  const btn = $(esSim ? 'btn-iniciar-sim' : 'btn-iniciar-diag');
+  const aviso = $('panel-fase-alerta');
+  aviso.classList.add('hidden');
+  btn.disabled = true;
+
+  try {
+    // Candado del servidor: la sesión debe seguir vigente en este dispositivo
+    const { data, error } = await obtenerSupabase().rpc('renovar_sesion', {
+      p_codigo: sesionActual.codigo,
+      p_token: sesionActual.token
+    });
+    if (error) throw error;
+    if (!data || !data.exito) {
+      alert((data && data.mensaje) || 'Tu sesión ya no es válida.');
+      await cerrarSesion();
+      return;
+    }
+
+    sesionActual = aplicarDatosServidor(sesionActual, data);   // fase/asignatura del servidor
+    const fase = sesionActual.fase;
+    const asig = sesionActual.asignatura;
+    const banco = await cargarBanco(fase, asig);
+
+    const preguntas = armarIntegral(banco, fase, asig, cfg.esp, cfg.ped, cfg.dig);
+
+    if (preguntas.length !== totalEsperado) {
+      throw new Error(`El examen debe tener ${totalEsperado} preguntas y se armaron ${preguntas.length}.`);
+    }
+    if (!preguntas.every(q => esPermitida(q, fase, asig))) {
+      throw new Error('Examen bloqueado: contiene preguntas no permitidas.');
+    }
+
+    console.info(`[ApruebaDocente] ${tipo}: ${preguntas.length} preguntas ` +
+      `(${cfg.esp} asignatura + ${cfg.ped} pedagógicos + ${cfg.dig} digitales)`);
+
+    examenActual = {
+      tipo: tipo,
+      preguntas: preguntas,
+      indice: 0,
+      respuestas: {},
+      feedback: {},
+      incidencias: 0,
+      tiempoRestante: esSim ? 165 * 60 : 0,
+      timer: null
+    };
+
+    mostrarPantalla('pantalla-examen');
+    renderExamenUI();                 // definida en examen.js
+
+    if (esSim) {
+      $('timer').textContent = '⏱ ' + formatearTiempo(examenActual.tiempoRestante);
+      iniciarCronometroExamen();      // definida en examen.js
+    } else {
+      $('timer').classList.add('hidden');
+    }
+  } catch (e) {
+    console.error(e);
+    aviso.textContent = e.message || 'No se pudo iniciar el examen.';
+    aviso.classList.remove('hidden');
+  } finally {
+    if (sesionActual && sesionActual.fase === 1) btn.disabled = false;
+  }
+}

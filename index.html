@@ -295,6 +295,51 @@
     .legal-cuerpo h3 { font-size: 14px; margin: 14px 0 4px; }
     .legal-cuerpo p { font-size: 13px; color: var(--mu); }
 
+    /* [NUEVO · TAREA 2] Vigencia: banners del panel docente y chips de estado del admin */
+    .banner-aviso  { background:#fef3c7; color:#92400e; border:1px solid #fde68a; }
+    .banner-peligro{ background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
+    .chip-vencida   { color:var(--er); font-weight:700; }
+    .chip-por-vencer{ color:#b45309; font-weight:700; }
+    .chip-ok        { color:var(--ok); font-weight:700; }
+    .chip-demo      { color:#1d4ed8; font-weight:700; }
+
+    /* [NUEVO · TAREA 2] Impresión del reporte de avance (Centro de Administración) */
+    #area-impresion { display: none; }
+    @media print {
+      body * { visibility: hidden; }
+      .pantalla { display: none !important; }
+      #area-impresion { display: block; }
+      #area-impresion, #area-impresion * { visibility: visible; }
+      #area-impresion { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; }
+      .no-print { display: none !important; }
+      @page { margin: 1.5cm; }
+    }
+
+    /* [NUEVO · TAREA 2] Bloque de consentimiento en el login */
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    .consent-block { border: 0; margin: 4px 0 16px; padding: 0; min-width: 0; }
+    .consent-item { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+    .login-form .consent-block input[type="checkbox"] { width: 18px; height: 18px; flex: none; margin: 1px 0 0; padding: 0; border: 0; accent-color: var(--p); cursor: pointer; box-shadow: none; }
+    .login-form .consent-block input[type="checkbox"]:disabled { cursor: not-allowed; }
+    .login-form .consent-block input[type="checkbox"]:focus-visible { outline: 3px solid #c7d2fe; outline-offset: 2px; }
+    .login-form .consent-block label { display: block; margin: 0; font-size: 13px; font-weight: 500; line-height: 1.4; color: var(--tx); cursor: pointer; }
+    .consent-block a { color: var(--p); font-weight: 600; text-decoration: underline; }
+    .consent-block a:focus-visible { outline: 3px solid #c7d2fe; outline-offset: 2px; border-radius: 4px; }
+    .consent-ok { font-size: 12px; font-weight: 600; color: var(--okd); margin: 2px 0 0; }
+
+    /* [NUEVO · TAREA 4] Banner de cookies informativas (no modal) */
+    .cookie-banner { position: fixed; left: 16px; right: 96px; bottom: 16px; z-index: 20; display: flex; align-items: center; gap: 16px; background: var(--w); color: var(--tx); border: 1px solid var(--ln); border-radius: 16px; box-shadow: 0 12px 40px rgba(15,23,42,.18); padding: 14px 18px; font-size: 13px; opacity: 0; transform: translateY(16px); transition: opacity .3s ease, transform .3s ease; }
+    .cookie-banner[hidden] { display: none; }
+    .cookie-banner.visible { opacity: 1; transform: none; }
+    .cookie-banner p { flex: 1; margin: 0; line-height: 1.45; }
+    .cookie-actions { display: flex; gap: 8px; flex: none; }
+    .cookie-actions .btn { padding: 8px 16px; font-size: 13px; }
+    @media (max-width: 600px) {
+      .cookie-banner { left: 0; right: 0; bottom: 0; border-radius: 16px 16px 0 0; border-width: 1px 0 0; flex-direction: column; align-items: stretch; gap: 10px; padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px)); }
+      .cookie-actions { justify-content: flex-end; }
+      body.banner-visible .wa-f { bottom: calc(var(--banner-h, 140px) + 12px); }
+    }
+
     @media (max-width: 850px) {
       .hero .wrap { grid-template-columns: 1fr; }
       .ln-links a:not(.btn) { display: none; }
@@ -456,6 +501,15 @@
     </footer>
 
     <a class="wa-f" href="https://wa.me/593983941622?text=Hola,%20quiero%20informaci%C3%B3n" target="_blank" aria-label="WhatsApp">💬</a>
+
+    <!-- [NUEVO · TAREA 4] Banner de cookies informativas -->
+    <div id="cookie-banner" class="cookie-banner" role="region" aria-label="Aviso de cookies" aria-describedby="cookie-banner-texto" hidden>
+      <p id="cookie-banner-texto">Usamos solo cookies y almacenamiento técnico necesarios para el funcionamiento del sitio (sesión y preferencias).</p>
+      <div class="cookie-actions">
+        <button type="button" class="btn btn-primary" onclick="aceptarCookies()">Aceptar</button>
+        <button type="button" class="btn btn-secondary" onclick="abrirLegal('privacidad')">Más info</button>
+      </div>
+    </div>
   </div>
 
   <!-- ==================== 2. PANTALLA LOGIN ==================== -->
@@ -485,7 +539,20 @@
           </select>
         </div>
 
-        <button class="btn btn-primary btn-block" id="btn-entrar" onclick="iniciarSesion()">Ingresar al simulador</button>
+        <!-- [NUEVO · TAREA 2] Consentimiento informado obligatorio -->
+        <fieldset class="consent-block">
+          <legend class="sr-only">Consentimiento informado</legend>
+          <div class="consent-item">
+            <input type="checkbox" id="consent-terminos" aria-describedby="consent-terminos-link">
+            <label for="consent-terminos">He leído y acepto los <a href="#" id="consent-terminos-link" onclick="abrirLegal('terminos'); return false;">Términos y condiciones</a></label>
+          </div>
+          <div class="consent-item">
+            <input type="checkbox" id="consent-privacidad" aria-describedby="consent-privacidad-link">
+            <label for="consent-privacidad">He leído y acepto la <a href="#" id="consent-privacidad-link" onclick="abrirLegal('privacidad'); return false;">Política de privacidad</a> y el uso de cookies técnicas necesarias</label>
+          </div>
+          <p id="consent-aceptado-nota" class="consent-ok hidden" role="status" aria-live="polite"></p>
+        </fieldset>
+        <button class="btn btn-primary btn-block" id="btn-entrar" disabled onclick="iniciarSesion()">Ingresar al simulador</button>
         <div id="login-error" class="alerta-err hidden"></div>
       </div>
       <div style="margin-top:20px; font-size:13px;">
@@ -507,6 +574,9 @@
     </header>
     <main class="panel-main">
       <div class="info-usuario" id="resumen-intentos"></div>
+      <!-- [NUEVO · TAREA 2] Aviso de vencimiento de la licencia -->
+      <div id="panel-vencimiento" class="hidden" role="status" aria-live="polite"
+           style="margin-bottom:16px; padding:12px 16px; border-radius:10px; font-size:14px; font-weight:600;"></div>
       <div style="background:#fff; border-radius:16px; padding:24px; border:1px solid var(--ln); box-shadow:var(--shadow)">
         <h2 style="font-size:18px; margin-bottom:6px;">Tu espacio de preparación</h2>
         <p style="color:var(--mu); font-size:14px; margin-bottom:20px;">Tu examen integra preguntas de Digitales, Pedagógicos y tu especialidad.</p>
@@ -678,6 +748,8 @@
               <div id="nota-temporal" class="hidden" style="font-size:0.85rem; color:var(--mu); margin-bottom:0.5rem;">
                 ⚠ Usuario temporal de prueba. Prefijo “prueba-”.
               </div>
+              <!-- [NUEVO · TAREA 2] Vencimiento de la licencia recién creada -->
+              <div id="codigo-vence" class="hidden" style="font-size:0.9rem; font-weight:600; margin-bottom:0.5rem;"></div>
               <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.6rem;">
                 <button class="btn btn-secondary" onclick="copiarUsuario()">Copiar</button>
                 <button class="btn btn-success" onclick="enviarWhatsApp()">Enviar por WhatsApp</button>
@@ -706,9 +778,15 @@
           <section id="admin-usuarios" class="admin-seccion card-admin">
             <div class="section-heading">
               <div><span class="section-kicker">DIRECTORIO</span><h2>Docentes registrados</h2><p>Listado de accesos, fase asignada y actividad de cada docente.</p></div>
+            <!-- [NUEVO · TAREA 2] Borrado total del historial (peligroso) -->
+            <button class="btn btn-danger no-print" id="btn-admin-borrar-historial"
+                    onclick="adminBorrarTodoHistorial()"
+                    aria-label="Borrar todo el historial de intentos">
+              🗑 Borrar TODO el historial
+            </button>
             </div>
             <div class="table-wrap">
-              <table class="tabla"><thead><tr><th>Usuario</th><th>Fase</th><th>Asignatura</th><th>Intentos</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="admin-usuarios-body"></tbody></table>
+              <table class="tabla"><thead><tr><!-- [NUEVO · TAREA 2] columnas de vigencia --><th>Usuario</th><th>Fase</th><th>Asignatura</th><th>Vence el</th><th>Estado</th><th>Intentos</th><th>Consentimiento</th><th>Acción</th></tr></thead><tbody id="admin-usuarios-body"></tbody></table>
             </div>
           </section>
 
@@ -760,9 +838,13 @@
     </div>
   </dialog>
 
+  <!-- [NUEVO · TAREA 2] Área oculta donde se arma el reporte de avance para imprimir -->
+  <div id="area-impresion"></div>
+
   <!-- Importaciones al final del cuerpo HTML -->
   <script src="config.js"></script>
-  <script src="app.js"></script>
+  <script src="legales.js"></script>   <!-- [NUEVO · TAREA 2] faltaba: sin él abrirLegal() falla (LEGAL vive aquí) -->
+  <script src="app.js?v=2"></script>
   <script src="examen.js"></script>
   <script src="admin.js"></script>
 </body>

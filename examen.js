@@ -3,70 +3,7 @@
    anti-copia, finalizar/guardar, resultados e historial del docente.
    Depende de app.js (sesionActual, cargarBanco, armarIntegral, esPermitida).
    ===================================================================== */
-async function iniciarExamen(tipo) {
-  if (!sesionActual) { mostrarPantalla('pantalla-login'); return; }
-  if (examenActual) return;
-
-  const esSim = tipo === 'simulacro';
-  const btn = $(esSim ? 'btn-iniciar-sim' : 'btn-iniciar-diag');
-  const aviso = $('panel-fase-alerta');
-  aviso.classList.add('hidden');
-  btn.disabled = true;
-
-  try {
-    // Candado del servidor: la sesión debe seguir vigente en este dispositivo
-    const { data, error } = await obtenerSupabase().rpc('renovar_sesion', {
-      p_codigo: sesionActual.codigo,
-      p_token: sesionActual.token
-    });
-    if (error) throw error;
-    if (!data || !data.exito) {
-      alert((data && data.mensaje) || 'Tu sesión ya no es válida.');
-      await cerrarSesion();
-      return;
-    }
-
-    sesionActual = aplicarDatosServidor(sesionActual, data);   // fase/asignatura del servidor
-    const fase = sesionActual.fase;
-    const asig = sesionActual.asignatura;
-    const banco = await cargarBanco(fase, asig);
-
-    // Diagnóstico: 5 asignatura + 2 Pedagógicos + 3 Digitales | Simulacro: 10 + 5 + 5
-    const preguntas = esSim ? armarIntegral(banco, fase, asig, 10, 5, 5) : armarIntegral(banco, fase, asig, 5, 2, 3);
-
-    // Candado del motor: TODAS deben ser permitidas
-    if (!preguntas.every(q => esPermitida(q, fase, asig))) {
-      throw new Error('Examen bloqueado: contiene preguntas no permitidas.');
-    }
-
-    examenActual = {
-      tipo: tipo,
-      preguntas: preguntas,
-      indice: 0,
-      respuestas: {},
-      feedback: {},
-      incidencias: 0,
-      tiempoRestante: esSim ? 165 * 60 : 0,
-      timer: null
-    };
-
-    mostrarPantalla('pantalla-examen');
-    renderExamenUI();
-
-    if (esSim) {
-      $('timer').textContent = '⏱ ' + formatearTiempo(examenActual.tiempoRestante);
-      iniciarCronometroExamen();
-    } else {
-      $('timer').classList.add('hidden');
-    }
-  } catch (e) {
-    console.error(e);
-    aviso.textContent = e.message || 'No se pudo iniciar el examen.';
-    aviso.classList.remove('hidden');
-  } finally {
-    if (sesionActual && sesionActual.fase === 1) btn.disabled = false;
-  }
-}
+/* NOTA: iniciarExamen y armarIntegral viven en app.js. NO redefinirlas aquí. */
 
 /* ---------- 10. PANTALLA EXAMEN, ANTI-COPIA & RESULTADOS (B4) ---------- */
 function renderExamenUI() {
