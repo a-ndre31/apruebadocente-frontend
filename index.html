@@ -353,6 +353,16 @@
 </head>
 <body>
 
+  <!-- [NUEVO] Advertencia para móviles -->
+  <div id="mobile-warning" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:99999; background:#0f172a; color:#fff; align-items:center; justify-content:center; text-align:center; padding:24px; box-sizing:border-box;" role="dialog" aria-modal="true" aria-labelledby="mobile-warning-title">
+    <div style="max-width:420px;">
+      <div style="font-size:56px; margin-bottom:16px;">💻</div>
+      <h2 id="mobile-warning-title" style="font-size:24px; font-weight:800; margin-bottom:12px; color:#fff;">Mejor experiencia en laptop o PC</h2>
+      <p style="font-size:16px; line-height:1.6; color:#cbd5e1; margin-bottom:28px;">Para que te concentres en tu simulacro y evites distracciones, te recomendamos usar ApruebaDocente desde una laptop o computadora. Si lo prefieres, también puedes continuar desde tu celular.</p>
+      <button type="button" class="btn btn-cta btn-lg" onclick="document.getElementById('mobile-warning').style.display='none'">Entiendo, continuar en móvil</button>
+    </div>
+  </div>
+
   <svg width="0" height="0" style="position:absolute">
     <symbol id="logo" viewBox="0 0 32 32">
       <rect width="32" height="32" rx="9" fill="#4f46e5"/>
@@ -372,6 +382,7 @@
           <a href="#incluye">Qué incluye</a>
           <a href="#precios">Precio</a>
           <a href="#faq">Preguntas</a>
+          <a href="#soporte">Soporte</a>
           <button class="btn btn-outline-white" onclick="accederAdmin(event)">Soy administrador</button>
           <button class="btn btn-primary" onclick="mostrarPantalla('pantalla-login')">Ya tengo licencia</button>
         </div>
@@ -480,6 +491,31 @@
         <details><summary>¿Cómo recibo mi acceso?</summary><p>Te enviamos tu código de usuario personal inmediatamente después de coordinar por WhatsApp.</p></details>
         <details><summary>¿Puedo usarlo desde mi celular?</summary><p>Sí, la plataforma es 100% responsiva y funciona en celulares, tablets y computadoras.</p></details>
         <details><summary>¿Incluye las preguntas de mi asignatura?</summary><p>Sí, cada prueba integra los componentes generales (Digitales y Pedagógicos) y tu asignatura específica.</p></details>
+      </div>
+    </section>
+
+    <section class="sec" id="soporte">
+      <div class="wrap">
+        <h2>Soporte y Nosotros</h2>
+        <p class="lead">Estamos para ayudarte antes, durante y después de tu preparación.</p>
+        <div class="g3">
+          <div class="ben">
+            <div class="cap c-v">🛠️</div>
+            <h3>Soporte Técnico</h3>
+            <p>¿Problemas para ingresar o con tu licencia? Escríbenos y te ayudamos lo antes posible.</p>
+            <a href="https://wa.me/593983941622" target="_blank" rel="noopener" class="btn btn-cta btn-block" style="margin-top:16px">Escribir por WhatsApp</a>
+          </div>
+          <div class="ben">
+            <div class="cap c-i">🇪🇨</div>
+            <h3>Sobre Nosotros</h3>
+            <p>ApruebaDocente es una plataforma independiente creada en Ecuador para ayudar a los docentes a prepararse con simulacros prácticos y retroalimentación clara.</p>
+          </div>
+          <div class="ben">
+            <div class="cap c-a">💳</div>
+            <h3>Pagos y Licencias</h3>
+            <p>El pago de tu licencia se realiza por transferencia bancaria. Coordina por WhatsApp para recibir los datos de la cuenta y, al enviar tu comprobante, te entregamos tu código de acceso.</p>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -778,12 +814,20 @@
           <section id="admin-usuarios" class="admin-seccion card-admin">
             <div class="section-heading">
               <div><span class="section-kicker">DIRECTORIO</span><h2>Docentes registrados</h2><p>Listado de accesos, fase asignada y actividad de cada docente.</p></div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start;">
+            <!-- [NUEVO] Exportar docentes a CSV/Excel -->
+            <button class="btn btn-success no-print" id="btn-admin-exportar-excel"
+                    onclick="exportarUsuariosExcel()"
+                    aria-label="Exportar docentes registrados a Excel">
+              📥 Exportar a Excel
+            </button>
             <!-- [NUEVO · TAREA 2] Borrado total del historial (peligroso) -->
             <button class="btn btn-danger no-print" id="btn-admin-borrar-historial"
                     onclick="adminBorrarTodoHistorial()"
                     aria-label="Borrar todo el historial de intentos">
               🗑 Borrar TODO el historial
             </button>
+            </div>
             </div>
             <div class="table-wrap">
               <table class="tabla"><thead><tr><!-- [NUEVO · TAREA 2] columnas de vigencia --><th>Usuario</th><th>Fase</th><th>Asignatura</th><th>Vence el</th><th>Estado</th><th>Intentos</th><th>Consentimiento</th><th>Acción</th></tr></thead><tbody id="admin-usuarios-body"></tbody></table>
@@ -847,5 +891,12 @@
   <script src="app.js?v=2"></script>
   <script src="examen.js"></script>
   <script src="admin.js"></script>
+  <!-- [NUEVO] Detección de móvil -->
+  <script>
+    if (window.innerWidth <= 768) {
+      var mw = document.getElementById('mobile-warning');
+      if (mw) mw.style.display = 'flex';
+    }
+  </script>
 </body>
 </html>

@@ -39,7 +39,7 @@ async function adminLogin(e) {
     const { data, error } = await obtenerSupabase().rpc('admin_verificar', { p_clave: clave });
     if (error) throw error;
     if (data === true) {
-      adminClave = clave; 
+      adminClave = clave;
       $('modal-admin').close();
       mostrarPantalla('pantalla-admin');
       cambiarTabAdmin('resumen');
@@ -172,7 +172,6 @@ async function guardarLicenciaEnSistema(codigo, cliente, fase, asignatura, esDem
 
   $('codigo-generado').classList.add('visible');
 
-  // [NUEVO · TAREA 4] Muestra cuándo vence la licencia recién creada (dato real del servidor)
   const venceEl = $('codigo-vence');
   if (venceEl) {
     venceEl.classList.add('hidden');
@@ -201,7 +200,6 @@ function enviarWhatsApp() {
   }
 }
 
-// [NUEVO · TAREA 4] Chip de estado/vigencia de una licencia. Si faltan datos (fallback) muestra "—".
 function renderEstadoLicencia(u) {
   if (u.vencida === undefined || u.vencida === null) return '—';
   const seg = Number(u.segundos_restantes) || 0;
@@ -211,7 +209,6 @@ function renderEstadoLicencia(u) {
   return '<span class="chip-ok">● Activa · ' + esc(formatearVencimiento(seg)) + '</span>';
 }
 
-// [NUEVO · TAREA 4] Lista docentes con vigencia (admin_estado_licencias) y, si falla, cae a listar_usuarios.
 async function cargarUsuariosAdmin() {
   const tbody = $('admin-usuarios-body');
   if (!tbody || !adminClave) return;
@@ -235,13 +232,14 @@ async function cargarUsuariosAdmin() {
       data = r2.data;
     }
 
-    // Consentimientos (si la migración aún no se ejecutó, no rompe la tabla)
     let consent = {};
     try {
       const rc = await sb.rpc('listar_consentimientos', { p_clave: adminClave });
       (rc.data || []).forEach(c => { consent[c.licencia_codigo] = c.consentimiento_fecha; });
     } catch (_) {}
 
+    window.datosUsuariosAdmin = data;
+    window.consentimientosAdmin = consent;
     tbody.innerHTML = data.map(u => {
       const esDemo = (u.es_demo !== undefined && u.es_demo !== null) ? !!u.es_demo : String(u.codigo).startsWith(DEMO_PREFIJO);
       const venceEl = u.fecha_vencimiento ? esc(formatearFechaHoraDDMMAAAA(u.fecha_vencimiento)) : '—';
@@ -272,7 +270,59 @@ async function cargarUsuariosAdmin() {
   }
 }
 
-// [NUEVO · TAREA 3] Toast discreto en la esquina inferior derecha (se desvanece en 3 s).
+function exportarUsuariosExcel() {
+  const datos = window.datosUsuariosAdmin;
+  if (!Array.isArray(datos) || datos.length === 0) {
+    if (typeof mostrarToast === 'function') mostrarToast('No hay docentes para exportar. Abre la pestaña de docentes primero.', 'error');
+    else alert('No hay docentes para exportar.');
+    return;
+  }
+  const consent = window.consentimientosAdmin || {};
+
+  const celda = (v) => {
+    let s = (v === undefined || v === null) ? '' : String(v);
+    if (/^[=+\-@]/.test(s)) s = "'" + s;
+    return '"' + s.replace(/"/g, '""') + '"';
+  };
+
+  const estadoTexto = (u, esDemo) => {
+    if (u.vencida === undefined || u.vencida === null) return '—';
+    if (u.vencida) return 'Vencida';
+    if (esDemo) return 'Demo';
+    const seg = Number(u.segundos_restantes) || 0;
+    return seg < 7 * 24 * 3600 ? 'Por vencer' : 'Activa';
+  };
+
+  const encabezados = ['Código', 'Cliente', 'Fase', 'Asignatura', 'Vence el', 'Estado', 'Intentos', 'Consentimiento'];
+  const filas = datos.map(u => {
+    const esDemo = (u.es_demo !== undefined && u.es_demo !== null) ? !!u.es_demo : String(u.codigo).startsWith(DEMO_PREFIJO);
+    const venceEl = u.fecha_vencimiento ? formatearFechaHoraDDMMAAAA(u.fecha_vencimiento) : '—';
+    const intentos = (u.intentos_count === undefined || u.intentos_count === null) ? '—' : u.intentos_count;
+    const fechaC = u.consentimiento_fecha || consent[u.codigo];
+    return [
+      u.codigo,
+      u.cliente,
+      'Fase ' + (u.fase === undefined || u.fase === null ? '' : u.fase),
+      u.asignatura,
+      venceEl,
+      estadoTexto(u, esDemo),
+      intentos,
+      fechaC ? formatearFechaDDMMAAAA(fechaC) : '—'
+    ];
+  });
+
+  const csv = [encabezados].concat(filas).map(f => f.map(celda).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const enlace = document.createElement('a');
+  enlace.href = url;
+  enlace.download = 'docentes_apruebadocente.csv';
+  document.body.appendChild(enlace);
+  enlace.click();
+  document.body.removeChild(enlace);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function mostrarToast(mensaje, tipo = 'ok') {
   const t = document.createElement('div');
   t.setAttribute('role', 'status');
@@ -280,13 +330,12 @@ function mostrarToast(mensaje, tipo = 'ok') {
   t.textContent = mensaje;
   t.style.cssText = 'position:fixed; right:20px; bottom:20px; z-index:10000; max-width:320px; padding:12px 16px; border-radius:12px; '
     + 'color:#fff; font:600 14px Inter, sans-serif; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:1; transition:opacity .5s ease; '
-    + 'background:' + (tipo === 'error' ? 'var(--er)' : (tipo === 'info' ? '#64748b' : 'var(--okd)')) + ';';   // [NUEVO · TAREA 4] tipo info
+    + 'background:' + (tipo === 'error' ? 'var(--er)' : (tipo === 'info' ? '#64748b' : 'var(--okd)')) + ';';
   document.body.appendChild(t);
   setTimeout(() => { t.style.opacity = '0'; }, 2500);
   setTimeout(() => { t.remove(); }, 3000);
 }
 
-// [NUEVO · TAREA 3] Elimina UN docente y todos sus datos (confirmación de un clic).
 let borrandoDocente = false;
 async function adminBorrarDocente(codigo, intentosCount) {
   if (borrandoDocente) return;
@@ -301,7 +350,7 @@ async function adminBorrarDocente(codigo, intentosCount) {
     if (error) throw error;
     if (data && data.exito) {
       mostrarToast('✓ Docente eliminado: ' + codigo, 'ok');
-      await cargarUsuariosAdmin();   // solo las tablas, sin recargar la página
+      await cargarUsuariosAdmin();
       cargarStatsAdmin();
     } else {
       alert((data && data.mensaje) || 'No se pudo eliminar al docente.');
@@ -313,7 +362,6 @@ async function adminBorrarDocente(codigo, intentosCount) {
   }
 }
 
-// [NUEVO · TAREA 3] Borra TODOS los intentos y respuestas (pide tipear BORRAR-HISTORIAL).
 async function adminBorrarTodoHistorial() {
   const txt = prompt('Vas a borrar TODOS los intentos y respuestas de TODOS los docentes. Esto NO se puede deshacer.\n\nPara confirmar, escribe exactamente: BORRAR-HISTORIAL');
   if (txt !== 'BORRAR-HISTORIAL') return;
@@ -337,10 +385,18 @@ async function adminBorrarTodoHistorial() {
   }
 }
 
-// [NUEVO · TAREA 3] Reporte imprimible del avance de un docente.
+/* =====================================================================
+   Reporte de Avance Detallado con diagramas lineales por tipo.
+   - Dos gráficos SVG: Diagnóstico y Simulacro (evolución por fecha).
+   - Línea de referencia en 700 (aprobación).
+   - Mantiene encabezado, resumen, historial y análisis de fallos.
+   ===================================================================== */
 async function adminImprimirAvance(codigo) {
   try {
-    const { data, error } = await obtenerSupabase().rpc('admin_historial_por_licencia', { p_clave: adminClave, p_codigo: codigo });
+    const sb = obtenerSupabase();
+
+    // 1) Historial de evaluaciones del docente
+    const { data, error } = await sb.rpc('admin_historial_por_licencia', { p_clave: adminClave, p_codigo: codigo });
     if (error) throw error;
     if (!data || !data.exito) {
       alert((data && data.mensaje) || 'No se pudo obtener el historial.');
@@ -352,50 +408,264 @@ async function adminImprimirAvance(codigo) {
       return;
     }
 
+    // 2) Análisis de fallos (robusto)
+    let fallosPorTema = [];
+    let notaFallos = '';
+    try {
+      const intentoIds = filas.map(r => r.id ?? r.intento_id ?? r.intento ?? r.id_intento).filter(Boolean);
+      let respuestasIncorrectas = [];
+
+      if (intentoIds.length) {
+        const ra = await sb.from('respuestas').select('*').in('intento_id', intentoIds);
+        if (!ra.error && Array.isArray(ra.data)) {
+          respuestasIncorrectas = ra.data.filter(x => x.es_correcta === false);
+        }
+      }
+      if (!respuestasIncorrectas.length) {
+        const rb = await sb.from('respuestas').select('*').eq('licencia_codigo', codigo);
+        if (!rb.error && Array.isArray(rb.data)) {
+          respuestasIncorrectas = rb.data.filter(x => x.es_correcta === false);
+        }
+      }
+      if (!respuestasIncorrectas.length) {
+        const rc = await sb.from('respuestas').select('*').limit(1000);
+        if (!rc.error && Array.isArray(rc.data) && rc.data.length) {
+          const colsCod = ['licencia_codigo','codigo_licencia','codigo','licencia','licencia_id'];
+          const colCod = colsCod.find(c => Object.prototype.hasOwnProperty.call(rc.data[0], c));
+          const colCorrecta = ['es_correcta','correcta','acierto','es_acierto']
+            .find(c => Object.prototype.hasOwnProperty.call(rc.data[0], c)) || 'es_correcta';
+          if (colCod) {
+            respuestasIncorrectas = rc.data.filter(x =>
+              String(x[colCod]) === String(codigo) && x[colCorrecta] === false
+            );
+          }
+        }
+      }
+
+      const colPregunta = respuestasIncorrectas.length ? (
+        'pregunta_id' in respuestasIncorrectas[0] ? 'pregunta_id' :
+        'pregunta' in respuestasIncorrectas[0] ? 'pregunta' :
+        'id_pregunta' in respuestasIncorrectas[0] ? 'id_pregunta' : null
+      ) : null;
+
+      const preguntaIds = [...new Set(respuestasIncorrectas.map(r => r[colPregunta]).filter(Boolean))];
+      const mapaTemas = {};
+      if (preguntaIds.length) {
+        const rp = await sb.from('preguntas').select('*').in('id', preguntaIds);
+        if (!rp.error && Array.isArray(rp.data)) {
+          const colsTema = ['tema','materia','componente','area','subtema'];
+          const colTema = colsTema.find(c => rp.data.length && Object.prototype.hasOwnProperty.call(rp.data[0], c)) || 'tema';
+          rp.data.forEach(p => { mapaTemas[p.id] = p[colTema] || 'Sin tema'; });
+        }
+      }
+
+      const conteo = {};
+      respuestasIncorrectas.forEach(r => {
+        const tema = mapaTemas[r[colPregunta]] || 'Sin tema';
+        conteo[tema] = (conteo[tema] || 0) + 1;
+      });
+      fallosPorTema = Object.entries(conteo).map(([tema, fallos]) => ({ tema, fallos })).sort((a, b) => b.fallos - a.fallos);
+      if (!fallosPorTema.length) notaFallos = 'Sin fallos registrados o datos no disponibles.';
+    } catch (eFallos) {
+      console.warn('No se pudo generar el análisis de fallos:', eFallos);
+      notaFallos = 'No se pudo generar el análisis de fallos: ' + (eFallos.message || eFallos);
+    }
+
+    // 3) Resumen
+    const totalIntentos = filas.length;
+    const puntajes = filas.map(r => Number(r.puntaje) || 0);
+    const promedio = Math.round(puntajes.reduce((a, b) => a + b, 0) / totalIntentos);
+    const mejorPuntaje = Math.max(...puntajes);
+
+    // 4) Encabezado
     const ahora = new Date();
     const hhmm = String(ahora.getHours()).padStart(2, '0') + ':' + String(ahora.getMinutes()).padStart(2, '0');
-    const emision = formatearFechaDDMMAAAA(ahora.toISOString());   // definida en app.js
+    const emision = formatearFechaDDMMAAAA(ahora.toISOString());
     const etiquetaTipo = t => t === 'diagnostico' ? 'Diagnóstico' : (t === 'simulacro' ? 'Simulacro' : t);
-    const celda = 'border:1px solid #cbd5e1; padding:6px 8px; text-align:left; font-size:13px;';
+    const celda = 'border:1px solid #999; padding:6px 8px; text-align:left; font-size:13px;';
 
-    const filasHtml = filas.map(r => `
+    // 5) Historial ordenado por fecha descendente
+    const filasOrdenadas = [...filas].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    const filasHistorial = filasOrdenadas.map(r => {
+      const fechaTxt = r.fecha ? new Date(r.fecha).toLocaleDateString('es-EC') : '—';
+      const tipoTxt = etiquetaTipo(r.tipo || '—');
+      const puntajeTxt = (r.puntaje === undefined || r.puntaje === null) ? '—' : r.puntaje;
+      const resultTxt = r.aprobado ? 'Aprobado' : 'Reprobado';
+      const tiempoTxt = r.tiempo_usado_seg ? formatearTiempo(r.tiempo_usado_seg) : '—';
+      return `
       <tr>
-        <td style="${celda}">${esc(new Date(r.fecha).toLocaleDateString('es-EC'))}</td>
-        <td style="${celda}">${esc(etiquetaTipo(r.tipo))}</td>
-        <td style="${celda}">Fase ${esc(r.fase)}</td>
-        <td style="${celda}">${esc(r.asignatura)}</td>
-        <td style="${celda}"><strong>${esc(r.puntaje)}</strong></td>
-        <td style="${celda}">${r.aprobado ? 'Aprobado' : 'Reprobado'}</td>
-        <td style="${celda}">${r.tiempo_usado_seg ? esc(formatearTiempo(r.tiempo_usado_seg)) : '—'}</td>
-      </tr>`).join('');
+        <td style="${celda}">${esc(fechaTxt)}</td>
+        <td style="${celda}">${esc(tipoTxt)}</td>
+        <td style="${celda}"><strong>${esc(puntajeTxt)}</strong></td>
+        <td style="${celda}">${resultTxt}</td>
+        <td style="${celda}">${esc(tiempoTxt)}</td>
+      </tr>`;
+    }).join('');
 
+    // 6) Análisis de fallos
+    const filasFallos = fallosPorTema.length
+      ? fallosPorTema.map(f => `
+          <tr>
+            <td style="${celda}">${esc(f.tema)}</td>
+            <td style="${celda}"><strong>${esc(f.fallos)}</strong></td>
+          </tr>`).join('')
+      : `<tr><td colspan="2" style="${celda}; text-align:center; color:#64748b;">${esc(notaFallos || 'Sin fallos registrados o datos no disponibles.')}</td></tr>`;
+
+    // 7) Función auxiliar: dibuja un gráfico de línea SVG para un tipo dado
+    function construirGrafico(puntos, titulo, color) {
+      const W = 640, H = 220;
+      const pad = { top: 20, right: 20, bottom: 40, left: 45 };
+      const innerW = W - pad.left - pad.right;
+      const innerH = H - pad.top - pad.bottom;
+      const maxY = 1000;
+
+      if (!puntos.length) {
+        return `<div style="border:1px solid #cbd5e1; border-radius:8px; padding:24px; text-align:center; color:#64748b; font-size:13px; margin-bottom:16px;">
+          <strong>${esc(titulo)}</strong><br>Sin evaluaciones de este tipo registradas.
+        </div>`;
+      }
+
+      const n = puntos.length;
+      const dx = n > 1 ? innerW / (n - 1) : 0;
+      const xAt = i => pad.left + (n > 1 ? i * dx : innerW / 2);
+      const yAt = v => pad.top + innerH - (Math.max(0, Math.min(maxY, v)) / maxY) * innerH;
+
+      const guiasY = [0, 250, 500, 700, 1000];
+      const lineasGuia = guiasY.map(v => {
+        const y = yAt(v);
+        const esAprob = v === 700;
+        return `<line x1="${pad.left}" y1="${y}" x2="${pad.left + innerW}" y2="${y}"
+                 stroke="${esAprob ? '#dc2626' : '#e2e8f0'}"
+                 stroke-width="${esAprob ? 1.5 : 1}"
+                 stroke-dasharray="${esAprob ? '5,4' : '0'}" />
+                <text x="${pad.left - 6}" y="${y + 4}" text-anchor="end"
+                      font-size="10" fill="${esAprob ? '#dc2626' : '#94a3b8'}">${v}</text>`;
+      }).join('');
+
+      const yAprob = yAt(700);
+      const etiquetaAprob = `<text x="${pad.left + innerW - 4}" y="${yAprob - 4}" text-anchor="end"
+                              font-size="9" fill="#dc2626" font-weight="600">Aprobación 700</text>`;
+
+      const pathD = puntos.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i)},${yAt(p.puntaje)}`).join(' ');
+      const linea = `<path d="${pathD}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />`;
+
+      const puntosSvg = puntos.map((p, i) => {
+        const cx = xAt(i), cy = yAt(p.puntaje);
+        const colorP = p.aprobado ? '#047857' : '#dc2626';
+        return `
+          <circle cx="${cx}" cy="${cy}" r="5" fill="#fff" stroke="${colorP}" stroke-width="2.5" />
+          <text x="${cx}" y="${cy - 10}" text-anchor="middle" font-size="10" font-weight="700" fill="${colorP}">${p.puntaje}</text>
+          <text x="${cx}" y="${H - pad.bottom + 14}" text-anchor="middle" font-size="9" fill="#64748b">${p.fechaCorta}</text>
+        `;
+      }).join('');
+
+      return `
+        <div style="border:1px solid #cbd5e1; border-radius:8px; padding:12px; margin-bottom:16px;">
+          <div style="font-size:13px; font-weight:700; color:#0f172a; margin-bottom:6px;">${esc(titulo)}</div>
+          <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto; display:block;">
+            <rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />
+            ${lineasGuia}
+            ${etiquetaAprob}
+            ${linea}
+            ${puntosSvg}
+            <line x1="${pad.left}" y1="${pad.top + innerH}" x2="${pad.left + innerW}" y2="${pad.top + innerH}" stroke="#94a3b8" stroke-width="1" />
+            <line x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + innerH}" stroke="#94a3b8" stroke-width="1" />
+            <text x="${pad.left + innerW / 2}" y="${H - 4}" text-anchor="middle" font-size="10" fill="#64748b">Fecha de evaluación</text>
+            <text x="12" y="${pad.top + innerH / 2}" text-anchor="middle" font-size="10" fill="#64748b"
+                  transform="rotate(-90 12 ${pad.top + innerH / 2})">Puntaje</text>
+          </svg>
+        </div>`;
+    }
+
+    // 8) Preparar los puntos para cada gráfico
+    const normalizar = r => ({
+      fecha: new Date(r.fecha),
+      fechaCorta: r.fecha ? new Date(r.fecha).toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit' }) : '',
+      puntaje: Number(r.puntaje) || 0,
+      aprobado: !!r.aprobado
+    });
+
+    const diagPuntos = filas
+      .filter(r => r.tipo === 'diagnostico')
+      .map(normalizar)
+      .sort((a, b) => a.fecha - b.fecha);
+
+    const simPuntos = filas
+      .filter(r => r.tipo === 'simulacro')
+      .map(normalizar)
+      .sort((a, b) => a.fecha - b.fecha);
+
+    const graficoDiag = construirGrafico(diagPuntos, 'Evolución · Evaluaciones Diagnósticas', '#2563eb');
+    const graficoSim = construirGrafico(simPuntos, 'Evolución · Simulacros Oficiales', '#7c3aed');
+
+    // 9) Documento final
     $('area-impresion').innerHTML = `
-      <div style="font-family:Inter, Arial, sans-serif; color:#0f172a;">
-        <h1 style="font-size:20px; margin:0 0 12px;">ApruebaDocente · Reporte de avance</h1>
-        <p style="font-size:14px; margin:0 0 4px;"><strong>Docente:</strong> ${esc(codigo)}</p>
-        <p style="font-size:14px; margin:0 0 4px;"><strong>Fase y asignatura:</strong> Fase ${esc(filas[0].fase)} · ${esc(filas[0].asignatura)}</p>
-        <p style="font-size:14px; margin:0 0 16px;"><strong>Fecha de emisión:</strong> ${esc(emision)}</p>
-        <table style="width:100%; border-collapse:collapse;">
+      <div style="font-family:Arial, sans-serif; color:#000; background:#fff;">
+        <h1 style="font-size:20px; margin:0 0 4px; text-align:center;">ApruebaDocente</h1>
+        <h2 style="font-size:16px; margin:0 0 16px; text-align:center; font-weight:600;">Reporte de Avance Detallado</h2>
+
+        <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+          <tbody>
+            <tr><td style="${celda}; width:30%;"><strong>Alumno:</strong></td><td style="${celda}">${esc(codigo)}</td></tr>
+            <tr><td style="${celda};"><strong>Licencia:</strong></td><td style="${celda}">${esc(codigo)}</td></tr>
+            <tr><td style="${celda};"><strong>Fase:</strong></td><td style="${celda}">Fase ${esc(filas[0].fase)}</td></tr>
+            <tr><td style="${celda};"><strong>Asignatura:</strong></td><td style="${celda}">${esc(filas[0].asignatura)}</td></tr>
+            <tr><td style="${celda};"><strong>Fecha de emisión:</strong></td><td style="${celda}">${esc(emision)} ${esc(hhmm)}</td></tr>
+          </tbody>
+        </table>
+
+        <h3 style="font-size:15px; margin:0 0 8px;">Resumen</h3>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+          <tbody>
+            <tr><td style="${celda}; width:30%;"><strong>Total de intentos:</strong></td><td style="${celda}">${totalIntentos}</td></tr>
+            <tr><td style="${celda};"><strong>Promedio:</strong></td><td style="${celda}">${promedio}</td></tr>
+            <tr><td style="${celda};"><strong>Mejor puntaje:</strong></td><td style="${celda}">${mejorPuntaje}</td></tr>
+          </tbody>
+        </table>
+
+        <h3 style="font-size:15px; margin:0 0 8px;">Evolución del puntaje</h3>
+        ${graficoDiag}
+        ${graficoSim}
+
+        <h3 style="font-size:15px; margin:0 0 8px;">Historial de evaluaciones</h3>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
           <thead>
             <tr style="background:#f1f5f9;">
-              <th style="${celda}">Fecha</th><th style="${celda}">Tipo</th><th style="${celda}">Fase</th>
-              <th style="${celda}">Asignatura</th><th style="${celda}">Puntaje</th><th style="${celda}">Resultado</th><th style="${celda}">Tiempo</th>
+              <th style="${celda}">Fecha</th>
+              <th style="${celda}">Tipo</th>
+              <th style="${celda}">Puntaje</th>
+              <th style="${celda}">Resultado</th>
+              <th style="${celda}">Tiempo</th>
             </tr>
           </thead>
-          <tbody>${filasHtml}</tbody>
+          <tbody>${filasHistorial}</tbody>
         </table>
-        <p style="font-size:12px; color:#64748b; margin-top:20px;">Generado el ${esc(emision)} ${esc(hhmm)} · Documento de seguimiento pedagógico</p>
+
+        <h3 style="font-size:15px; margin:0 0 8px;">Análisis de fallos por tema</h3>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+          <thead>
+            <tr style="background:#f1f5f9;">
+              <th style="${celda}">Tema</th>
+              <th style="${celda}">Fallos</th>
+            </tr>
+          </thead>
+          <tbody>${filasFallos}</tbody>
+        </table>
+
+        <p style="font-size:11px; color:#64748b; text-align:center; margin-top:24px;">
+          Documento de seguimiento pedagógico · Generado el ${esc(emision)} ${esc(hhmm)}
+        </p>
       </div>`;
 
     const limpiar = () => { $('area-impresion').innerHTML = ''; window.onafterprint = null; };
     window.onafterprint = limpiar;
     window.print();
   } catch (e) {
-    alert('Error al preparar el reporte de avance.');
+    console.error(e);
+    alert('Error al preparar el reporte de avance: ' + (e.message || e));
   }
 }
 
-// [NUEVO · TAREA 4] Renueva 3 meses una licencia real (no borra historial ni cierra la sesión).
 async function adminRenovarLicencia(codigo, esDemo) {
   if (esDemo) {
     alert('Las licencias de prueba no se renuevan. Crea una licencia real.');
@@ -417,7 +687,6 @@ async function adminRenovarLicencia(codigo, esDemo) {
   }
 }
 
-// [NUEVO · TAREA 4] Cierra la sesión del docente en todos sus dispositivos (reemplaza a "Liberar").
 async function adminCerrarSesionDocente(codigo) {
   if (!confirm(`¿Cerrar la sesión de "${codigo}" en todos sus dispositivos?\n\nPodrá volver a entrar desde cualquier dispositivo con su código. No se borra nada.`)) return;
 
