@@ -1,13 +1,8 @@
 /* =====================================================================
-   admin.js · PANEL DE ADMINISTRADOR: acceso (RPC admin_verificar), pestañas,
-   asignación de fase/asignatura al crear licencias (RPC crear_licencia),
-   usuarios, resultados, estadísticas y fallos.
-   La fase y la asignatura se guardan en Supabase (tabla licencias), NO en localStorage.
-   Depende de app.js (adminClave, obtenerSupabase, ASIGNATURAS_POR_FASE, esc).
+   admin.js · PANEL DE ADMINISTRADOR (Versión Definitiva con Canvas)
    ===================================================================== */
 let usuarioGeneradoTemp = '';
 
-/* ---------- 11. CENTRO DE ADMINISTRACIÓN (B5) ---------- */
 function accederAdmin(e) {
   if (e) e.preventDefault();
   const d = $('modal-admin');
@@ -385,17 +380,10 @@ async function adminBorrarTodoHistorial() {
   }
 }
 
-/* =====================================================================
-   Reporte de Avance Detallado con diagramas lineales por tipo.
-   - Dos gráficos SVG: Diagnóstico y Simulacro (evolución por fecha).
-   - Línea de referencia en 700 (aprobación).
-   - Mantiene encabezado, resumen, historial y análisis de fallos.
-   ===================================================================== */
 async function adminImprimirAvance(codigo) {
   try {
     const sb = obtenerSupabase();
 
-    // 1) Historial de evaluaciones del docente
     const { data, error } = await sb.rpc('admin_historial_por_licencia', { p_clave: adminClave, p_codigo: codigo });
     if (error) throw error;
     if (!data || !data.exito) {
@@ -408,7 +396,6 @@ async function adminImprimirAvance(codigo) {
       return;
     }
 
-    // 2) Análisis de fallos (robusto)
     let fallosPorTema = [];
     let notaFallos = '';
     try {
@@ -471,20 +458,17 @@ async function adminImprimirAvance(codigo) {
       notaFallos = 'No se pudo generar el análisis de fallos: ' + (eFallos.message || eFallos);
     }
 
-    // 3) Resumen
     const totalIntentos = filas.length;
     const puntajes = filas.map(r => Number(r.puntaje) || 0);
     const promedio = Math.round(puntajes.reduce((a, b) => a + b, 0) / totalIntentos);
     const mejorPuntaje = Math.max(...puntajes);
 
-    // 4) Encabezado
     const ahora = new Date();
     const hhmm = String(ahora.getHours()).padStart(2, '0') + ':' + String(ahora.getMinutes()).padStart(2, '0');
     const emision = formatearFechaDDMMAAAA(ahora.toISOString());
     const etiquetaTipo = t => t === 'diagnostico' ? 'Diagnóstico' : (t === 'simulacro' ? 'Simulacro' : t);
     const celda = 'border:1px solid #999; padding:6px 8px; text-align:left; font-size:13px;';
 
-    // 5) Historial ordenado por fecha descendente
     const filasOrdenadas = [...filas].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
     const filasHistorial = filasOrdenadas.map(r => {
       const fechaTxt = r.fecha ? new Date(r.fecha).toLocaleDateString('es-EC') : '—';
@@ -502,7 +486,6 @@ async function adminImprimirAvance(codigo) {
       </tr>`;
     }).join('');
 
-    // 6) Análisis de fallos
     const filasFallos = fallosPorTema.length
       ? fallosPorTema.map(f => `
           <tr>
@@ -511,18 +494,29 @@ async function adminImprimirAvance(codigo) {
           </tr>`).join('')
       : `<tr><td colspan="2" style="${celda}; text-align:center; color:#64748b;">${esc(notaFallos || 'Sin fallos registrados o datos no disponibles.')}</td></tr>`;
 
-    // 7) Función auxiliar: dibuja un gráfico de línea SVG para un tipo dado
-    function construirGrafico(puntos, titulo, color) {
-      const W = 640, H = 220;
+    // =====================================================================
+    // DIBUJAR GRÁFICOS USANDO <canvas> (A prueba de impresión)
+    // =====================================================================
+    function dibujarCanvas(id, puntos, color) {
+      const canvas = document.getElementById(id);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
       const pad = { top: 20, right: 20, bottom: 40, left: 45 };
       const innerW = W - pad.left - pad.right;
       const innerH = H - pad.top - pad.bottom;
       const maxY = 1000;
 
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, W, H);
+      ctx.font = '10px Arial';
+
       if (!puntos.length) {
-        return `<div style="border:1px solid #cbd5e1; border-radius:8px; padding:24px; text-align:center; color:#64748b; font-size:13px; margin-bottom:16px;">
-          <strong>${esc(titulo)}</strong><br>Sin evaluaciones de este tipo registradas.
-        </div>`;
+        ctx.fillStyle = '#64748b';
+        ctx.textAlign = 'center';
+        ctx.fillText('Sin evaluaciones de este tipo registradas.', W / 2, H / 2);
+        return;
       }
 
       const n = puntos.length;
@@ -530,54 +524,75 @@ async function adminImprimirAvance(codigo) {
       const xAt = i => pad.left + (n > 1 ? i * dx : innerW / 2);
       const yAt = v => pad.top + innerH - (Math.max(0, Math.min(maxY, v)) / maxY) * innerH;
 
-      const guiasY = [0, 250, 500, 700, 1000];
-      const lineasGuia = guiasY.map(v => {
+      // Líneas guías
+      [0, 250, 500, 700, 1000].forEach(v => {
         const y = yAt(v);
-        const esAprob = v === 700;
-        return `<line x1="${pad.left}" y1="${y}" x2="${pad.left + innerW}" y2="${y}"
-                 stroke="${esAprob ? '#dc2626' : '#e2e8f0'}"
-                 stroke-width="${esAprob ? 1.5 : 1}"
-                 stroke-dasharray="${esAprob ? '5,4' : '0'}" />
-                <text x="${pad.left - 6}" y="${y + 4}" text-anchor="end"
-                      font-size="10" fill="${esAprob ? '#dc2626' : '#94a3b8'}">${v}</text>`;
-      }).join('');
+        ctx.beginPath();
+        ctx.strokeStyle = v === 700 ? '#dc2626' : '#e2e8f0';
+        ctx.lineWidth = v === 700 ? 1.5 : 1;
+        if (v === 700) ctx.setLineDash([5, 4]);
+        else ctx.setLineDash([]);
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(pad.left + innerW, y);
+        ctx.stroke();
 
-      const yAprob = yAt(700);
-      const etiquetaAprob = `<text x="${pad.left + innerW - 4}" y="${yAprob - 4}" text-anchor="end"
-                              font-size="9" fill="#dc2626" font-weight="600">Aprobación 700</text>`;
+        ctx.fillStyle = v === 700 ? '#dc2626' : '#94a3b8';
+        ctx.textAlign = 'right';
+        ctx.fillText(v, pad.left - 6, y + 4);
+      });
+      ctx.setLineDash([]);
 
-      const pathD = puntos.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i)},${yAt(p.puntaje)}`).join(' ');
-      const linea = `<path d="${pathD}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />`;
+      // Texto aprobación
+      ctx.fillStyle = '#dc2626';
+      ctx.textAlign = 'right';
+      ctx.font = 'bold 9px Arial';
+      ctx.fillText('Aprobación 700', pad.left + innerW - 4, yAt(700) - 4);
 
-      const puntosSvg = puntos.map((p, i) => {
+      // Línea conectora
+      if (n > 1) {
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = 'round';
+        puntos.forEach((p, i) => {
+          if (i === 0) ctx.moveTo(xAt(i), yAt(p.puntaje));
+          else ctx.lineTo(xAt(i), yAt(p.puntaje));
+        });
+        ctx.stroke();
+      }
+
+      // Puntos
+      puntos.forEach((p, i) => {
         const cx = xAt(i), cy = yAt(p.puntaje);
-        const colorP = p.aprobado ? '#047857' : '#dc2626';
-        return `
-          <circle cx="${cx}" cy="${cy}" r="5" fill="#fff" stroke="${colorP}" stroke-width="2.5" />
-          <text x="${cx}" y="${cy - 10}" text-anchor="middle" font-size="10" font-weight="700" fill="${colorP}">${p.puntaje}</text>
-          <text x="${cx}" y="${H - pad.bottom + 14}" text-anchor="middle" font-size="9" fill="#64748b">${p.fechaCorta}</text>
-        `;
-      }).join('');
+        ctx.beginPath();
+        ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = p.aprobado ? '#047857' : '#dc2626';
+        ctx.stroke();
 
-      return `
-        <div style="border:1px solid #cbd5e1; border-radius:8px; padding:12px; margin-bottom:16px;">
-          <div style="font-size:13px; font-weight:700; color:#0f172a; margin-bottom:6px;">${esc(titulo)}</div>
-          <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto; display:block;">
-            <rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />
-            ${lineasGuia}
-            ${etiquetaAprob}
-            ${linea}
-            ${puntosSvg}
-            <line x1="${pad.left}" y1="${pad.top + innerH}" x2="${pad.left + innerW}" y2="${pad.top + innerH}" stroke="#94a3b8" stroke-width="1" />
-            <line x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + innerH}" stroke="#94a3b8" stroke-width="1" />
-            <text x="${pad.left + innerW / 2}" y="${H - 4}" text-anchor="middle" font-size="10" fill="#64748b">Fecha de evaluación</text>
-            <text x="12" y="${pad.top + innerH / 2}" text-anchor="middle" font-size="10" fill="#64748b"
-                  transform="rotate(-90 12 ${pad.top + innerH / 2})">Puntaje</text>
-          </svg>
-        </div>`;
+        // Etiqueta Puntaje
+        ctx.fillStyle = p.aprobado ? '#047857' : '#dc2626';
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 10px Arial';
+        ctx.fillText(p.puntaje, cx, cy - 10);
+
+        // Etiqueta Fecha
+        ctx.fillStyle = '#64748b';
+        ctx.font = '9px Arial';
+        ctx.fillText(p.fechaCorta, cx, H - pad.bottom + 14);
+      });
+
+      // Ejes
+      ctx.beginPath();
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 1;
+      ctx.moveTo(pad.left, pad.top + innerH); ctx.lineTo(pad.left + innerW, pad.top + innerH);
+      ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, pad.top + innerH);
+      ctx.stroke();
     }
 
-    // 8) Preparar los puntos para cada gráfico
     const normalizar = r => ({
       fecha: new Date(r.fecha),
       fechaCorta: r.fecha ? new Date(r.fecha).toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit' }) : '',
@@ -585,18 +600,8 @@ async function adminImprimirAvance(codigo) {
       aprobado: !!r.aprobado
     });
 
-    const diagPuntos = filas
-      .filter(r => r.tipo === 'diagnostico')
-      .map(normalizar)
-      .sort((a, b) => a.fecha - b.fecha);
-
-    const simPuntos = filas
-      .filter(r => r.tipo === 'simulacro')
-      .map(normalizar)
-      .sort((a, b) => a.fecha - b.fecha);
-
-    const graficoDiag = construirGrafico(diagPuntos, 'Evolución · Evaluaciones Diagnósticas', '#2563eb');
-    const graficoSim = construirGrafico(simPuntos, 'Evolución · Simulacros Oficiales', '#7c3aed');
+    const diagPuntos = filas.filter(r => r.tipo === 'diagnostico').map(normalizar).sort((a, b) => a.fecha - b.fecha);
+    const simPuntos = filas.filter(r => r.tipo === 'simulacro').map(normalizar).sort((a, b) => a.fecha - b.fecha);
 
     // 9) Documento final
     $('area-impresion').innerHTML = `
@@ -608,7 +613,8 @@ async function adminImprimirAvance(codigo) {
           <tbody>
             <tr><td style="${celda}; width:30%;"><strong>Alumno:</strong></td><td style="${celda}">${esc(codigo)}</td></tr>
             <tr><td style="${celda};"><strong>Licencia:</strong></td><td style="${celda}">${esc(codigo)}</td></tr>
-            <tr><td style="${celda};"><strong>Fase:</strong></td><td style="${celda}">Fase ${esc(filas[0].fase)}</td></tr>
+            <!-- CORRECCIÓN DE FASE:FASE -->
+            <tr><td style="${celda};"><strong>Fase:</strong></td><td style="${celda}">${esc(filas[0].fase)}</td></tr>
             <tr><td style="${celda};"><strong>Asignatura:</strong></td><td style="${celda}">${esc(filas[0].asignatura)}</td></tr>
             <tr><td style="${celda};"><strong>Fecha de emisión:</strong></td><td style="${celda}">${esc(emision)} ${esc(hhmm)}</td></tr>
           </tbody>
@@ -624,8 +630,16 @@ async function adminImprimirAvance(codigo) {
         </table>
 
         <h3 style="font-size:15px; margin:0 0 8px;">Evolución del puntaje</h3>
-        ${graficoDiag}
-        ${graficoSim}
+        
+        <div style="border:1px solid #cbd5e1; border-radius:8px; padding:12px; margin-bottom:16px;">
+          <div style="font-size:13px; font-weight:700; color:#0f172a; margin-bottom:6px;">Evolución · Evaluaciones Diagnósticas</div>
+          <canvas id="canvas-diag" width="640" height="220" style="display:block; max-width:100%;"></canvas>
+        </div>
+        
+        <div style="border:1px solid #cbd5e1; border-radius:8px; padding:12px; margin-bottom:16px;">
+          <div style="font-size:13px; font-weight:700; color:#0f172a; margin-bottom:6px;">Evolución · Simulacros Oficiales</div>
+          <canvas id="canvas-sim" width="640" height="220" style="display:block; max-width:100%;"></canvas>
+        </div>
 
         <h3 style="font-size:15px; margin:0 0 8px;">Historial de evaluaciones</h3>
         <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
@@ -657,9 +671,16 @@ async function adminImprimirAvance(codigo) {
         </p>
       </div>`;
 
+    // Dibujar gráficos justo después de inyectar el HTML
+    dibujarCanvas('canvas-diag', diagPuntos, '#2563eb');
+    dibujarCanvas('canvas-sim', simPuntos, '#7c3aed');
+
     const limpiar = () => { $('area-impresion').innerHTML = ''; window.onafterprint = null; };
     window.onafterprint = limpiar;
-    window.print();
+    
+    // Pequeño delay para asegurar que Canvas se dibuje antes de imprimir
+    setTimeout(() => { window.print(); }, 100);
+
   } catch (e) {
     console.error(e);
     alert('Error al preparar el reporte de avance: ' + (e.message || e));

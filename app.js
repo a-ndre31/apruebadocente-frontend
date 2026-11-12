@@ -4,7 +4,7 @@
    del examen (iniciarExamen / armarIntegral).
    ===================================================================== */
 
-const APP_VERSION = '2026.11.10-1';
+const APP_VERSION = '2026.11.12-4';
 console.info('[ApruebaDocente] app.js versión', APP_VERSION);
 
 /* ---------- 1. CONSTANTES & CONFIGURACIÓN ---------- */
@@ -42,6 +42,10 @@ const ASIGNATURAS_POR_FASE = {
 const LETRAS = ['A', 'B', 'C', 'D'];
 const CONSENT_VERSION = '2026-11-10';
 const DEMO_PREFIJO = 'prueba-';
+const LIMITE_SIMULACROS = 3; // debe coincidir con el valor de la función SQL verificar_limite_simulacros
+const MSG_CONEXION = 'Ups, tuvimos un problema de conexión. Revisa tu internet e intenta de nuevo.';
+const MSG_LIMITE_SIMULACROS = 'Has alcanzado el límite de 3 simulacros para esta licencia. ¡Sigue practicando con el diagnóstico!';
+const MSG_TUTORIAL = '¡Bienvenido! Usa el DIAGNÓSTICO para aprender con explicaciones, y el SIMULACRO para medirte como en el examen real';
 
 const EXAMEN_CONFIG = {
   diagnostico: { esp: 25, ped: 12, dig: 13 },
@@ -65,6 +69,22 @@ const ESC_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ESC_MAP[c]); }
 function fmt(s) { return esc(s).replace(/\r?\n/g, '<br>'); }
 
+/* ---------- Manejo de errores amigables ---------- */
+// Error cuyo mensaje SÍ es apto para mostrar al usuario tal cual.
+class ErrorAmigable extends Error {}
+
+// Devuelve el texto que verá el usuario: si el error ya es amigable lo respeta;
+// cualquier otro error (Supabase, red, código) se muestra como problema de conexión.
+function mensajeAmigable(e) {
+  return (e instanceof ErrorAmigable && e.message) ? e.message : MSG_CONEXION;
+}
+
+// Los detalles técnicos solo se escriben en la consola cuando trabajas en local.
+function logDev(...args) {
+  const local = ['localhost', '127.0.0.1', ''].includes(location.hostname);
+  if (local) console.error(...args);
+}
+
 function barajar(array) {
   const arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
@@ -85,21 +105,21 @@ function iniciarSupabase() {
   try {
     const urlOk = typeof SUPABASE_URL === 'string' && /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(SUPABASE_URL);
     const keyOk = typeof SUPABASE_KEY === 'string' && SUPABASE_KEY.length > 20 && SUPABASE_KEY.indexOf('TU_') === -1;
-    if (!urlOk || !keyOk) { console.warn('config.js: Variables de Supabase pendientes.'); return; }
-    if (!window.supabase || typeof window.supabase.createClient !== 'function') { console.warn('SDK de Supabase no cargado.'); return; }
+    if (!urlOk || !keyOk) { logDev('config.js: Variables de Supabase pendientes.'); return; }
+    if (!window.supabase || typeof window.supabase.createClient !== 'function') { logDev('SDK de Supabase no cargado.'); return; }
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
     });
     supabaseListo = true;
   } catch (e) {
-    console.error('Error inicializando Supabase:', e);
+    logDev('Error inicializando Supabase:', e);
     supabaseClient = null;
     supabaseListo = false;
   }
 }
 
 function obtenerSupabase() {
-  if (!supabaseListo) throw new Error('Supabase no está configurado.');
+  if (!supabaseListo) throw new ErrorAmigable(MSG_CONEXION);
   return supabaseClient;
 }
 
@@ -112,7 +132,10 @@ function mostrarPantalla(id) {
   window.scrollTo(0, 0);
 
   if (id === 'pantalla-login') actualizarEstadoBotonesLogin();
-  if (id === 'pantalla-panel') actualizarPanelDocenteUI();
+  if (id === 'pantalla-panel') {
+    actualizarPanelDocenteUI();
+    if (typeof resetCompromisoPanel === 'function') resetCompromisoPanel();
+  }
   if (id === 'pantalla-historial') cargarHistorialDocente();
 }
 
@@ -144,15 +167,53 @@ function init() {
 
   iniciarAntiCopiaEvents();
   verificarSesionLocal();
+
+  if (typeof actualizarBotonInicioExamen === 'function') actualizarBotonInicioExamen();
+
+  // 👇 ATACO SECRETO PARA CELULAR 👇
+  if (window.location.search.includes('admin')) {
+    setTimeout(() => accederAdmin(), 500);
+  }
+  // 👆 FIN DEL ATAJO SECRETO 👆
 }
 
 document.addEventListener('DOMContentLoaded', init);
 
 /* ---------- 6. BANCO DE PREGUNTAS (Supabase · RPC) ---------- */
 function claveAsignatura(s) {
-  return String(s == null ? '' : s)
+  if (!s) return '';
+  
+  // 1. Pasamos todo a minúsculas y quitamos tildes
+  let limpio = String(s)
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
+    .trim();
+
+  // 2. Buscamos las palabras clave ANTES de quitar paréntesis o símbolos
+  if (limpio.includes('ciencias naturales')) return 'ciencias naturales';
+  if (limpio.includes('estudios sociales')) return 'estudios sociales';
+  if (limpio.includes('educacion para la ciudadania')) return 'educacion para la ciudadania';
+  if (limpio.includes('emprendimiento')) return 'emprendimiento';
+  if (limpio.includes('filosofia')) return 'filosofia';
+  if (limpio.includes('quimica')) return 'quimica';
+  if (limpio.includes('biologia')) return 'biologia';
+  if (limpio.includes('fisica')) return 'fisica';
+  if (limpio.includes('lengua y literatura')) return 'lengua y literatura';
+  if (limpio.includes('matematica')) return 'matematica';
+  if (limpio.includes('educacion inicial')) return 'educacion inicial';
+  if (limpio.includes('educacion fisica')) return 'educacion fisica';
+  if (limpio.includes('ingles')) return 'ingles';
+  if (limpio.includes('bachillerato tecnico')) return 'bachillerato tecnico';
+  if (limpio.includes('educacion cultural')) return 'educacion cultural';
+  if (limpio.includes('kichwa')) return 'kichwa';
+  if (limpio.includes('shuar')) return 'shuar';
+  if (limpio.includes('frances')) return 'frances';
+  
+  // 3. Caso especial para EGB Básica (que no tiene una materia específica en el nombre)
+  if (limpio.includes('egb basica media')) return 'egb basica media';
+
+  // 4. Si no coincidió con ninguna, limpiamos el texto como respaldo
+  return limpio
     .replace(/\([^)]*\)/g, ' ')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
@@ -187,7 +248,7 @@ async function cargarBanco(fase, asignatura = null) {
     clave = 'demo|' + Number(fase);
     llamada = () => sb.rpc('obtener_banco_demo', { p_fase: Number(fase) });
   } else {
-    if (!sesionActual) throw new Error('Inicia sesión para cargar el banco de preguntas.');
+    if (!sesionActual) throw new ErrorAmigable('Tu sesión ya no está activa. Vuelve a ingresar con tu licencia.');
     clave = [sesionActual.codigo, Number(fase), claveAsignatura(asignatura)].join('|');
     llamada = () => sb.rpc('obtener_banco', {
       p_codigo: sesionActual.codigo,
@@ -199,18 +260,18 @@ async function cargarBanco(fase, asignatura = null) {
 
   const { data, error } = await llamada();
   if (error) {
-    console.error('Error cargando el banco:', error);
-    throw new Error(error.message || 'No se pudo cargar el banco de preguntas.');
+    logDev('Error cargando el banco:', error);
+    throw new ErrorAmigable(MSG_CONEXION);
   }
   if (!Array.isArray(data) || !data.length) {
-    throw new Error(asignatura
-      ? `No hay preguntas disponibles para tu licencia («${asignatura}»). Avisa al administrador.`
-      : 'Sin preguntas disponibles aún para esta fase.');
+    throw new ErrorAmigable(asignatura
+      ? `Aún no hay preguntas disponibles para tu asignatura («${asignatura}»). Escríbenos por WhatsApp y te ayudamos.`
+      : 'Aún no hay preguntas disponibles para esta fase.');
   }
 
   const banco = data.map(convertirPregunta).filter(esPreguntaValida);
   if (banco.length !== data.length) {
-    console.warn(`Banco: ${data.length - banco.length} preguntas inválidas descartadas.`);
+    logDev(`Banco: ${data.length - banco.length} preguntas inválidas descartadas.`);
   }
   cacheBanco[clave] = banco;
   return banco;
@@ -230,9 +291,9 @@ async function cargarDemo() {
     demoRespondida = false;
     renderDemo();
   } catch (e) {
-    console.error(e);
+    logDev(e);
     cont.innerHTML =
-      '<p class="alerta-err" role="alert">No se pudo obtener el reactivo de prueba.</p>' +
+      '<p class="alerta-err" role="alert">' + esc(MSG_CONEXION) + '</p>' +
       '<div class="demo-acciones"><button type="button" class="btn btn-primary" onclick="cargarDemo()">Reintentar</button></div>';
   }
 }
@@ -271,10 +332,10 @@ async function responderDemo(letra) {
     if (error) throw error;
     v = data;
   } catch (e) {
-    console.error(e);
+    logDev(e);
     demoRespondida = false;
     botones.forEach(b => { b.disabled = false; });
-    res.innerHTML = '<p class="alerta-err" role="alert">No se pudo verificar la respuesta. Intenta de nuevo.</p>';
+    res.innerHTML = '<p class="alerta-err" role="alert">' + esc(MSG_CONEXION) + '</p>';
     return;
   }
 
@@ -353,7 +414,7 @@ function guardarConsentimientoLocal(obj) {
   try {
     localStorage.setItem('evdo_consentimiento', JSON.stringify(registro));
   } catch (e) {
-    console.warn('No se pudo guardar el consentimiento local:', e);
+    logDev('No se pudo guardar el consentimiento local:', e);
   }
 }
 
@@ -399,9 +460,9 @@ async function registrarConsentimientoServidor(codigo, userAgent) {
       p_user_agent: userAgent || navigator.userAgent
     });
     if (error) throw error;
-    if (data && data.exito === false) console.warn('Consentimiento no registrado en el servidor:', data.mensaje);
+    if (data && data.exito === false) logDev('Consentimiento no registrado en el servidor:', data.mensaje);
   } catch (e) {
-    console.warn('No se pudo registrar el consentimiento en el servidor:', e);
+    logDev('No se pudo registrar el consentimiento en el servidor:', e);
   }
 }
 
@@ -568,8 +629,8 @@ async function iniciarSesion() {
     } catch (_) {}
 
   } catch (e) {
-    console.error(e);
-    errDiv.textContent = 'Error de conexión con el servidor de autenticación.';
+    logDev(e);
+    errDiv.textContent = MSG_CONEXION;
     errDiv.classList.remove('hidden');
   }
 }
@@ -663,19 +724,46 @@ function actualizarPanelDocenteUI() {
   const alertaFase = $('panel-fase-alerta');
 
   if (sesionActual.fase > 1) {
-    if (btnDiag) btnDiag.disabled = true;
-    if (btnSim) btnSim.disabled = true;
+    if (btnDiag) { btnDiag.disabled = true; btnDiag.dataset.bloqueadoFase = '1'; }
+    if (btnSim)  { btnSim.disabled  = true; btnSim.dataset.bloqueadoFase  = '1'; }
     if (alertaFase) {
       alertaFase.textContent = 'Sin preguntas disponibles aún para esta fase.';
       alertaFase.classList.remove('hidden');
     }
   } else {
-    if (btnDiag) btnDiag.disabled = false;
-    if (btnSim) btnSim.disabled = false;
+    if (btnDiag) { btnDiag.disabled = false; delete btnDiag.dataset.bloqueadoFase; }
+    if (btnSim)  { btnSim.disabled  = false; delete btnSim.dataset.bloqueadoFase; }
     if (alertaFase) alertaFase.classList.add('hidden');
   }
 
+  if (typeof actualizarBotonInicioExamen === 'function') actualizarBotonInicioExamen();
+
   actualizarBannerVencimiento();
+  actualizarAvisoIPhone();
+  mostrarTutorialBienvenida();
+}
+
+/* ---------- Aviso iPhone y tutorial de bienvenida ---------- */
+function esIPhone() {
+  return /iPhone|iPod/i.test(navigator.userAgent || '');
+}
+
+function actualizarAvisoIPhone() {
+  const box = $('aviso-iphone');
+  if (!box) return;
+  box.classList.toggle('hidden', !esIPhone());
+}
+
+function mostrarTutorialBienvenida() {
+  const CLAVE = 'evdo_tutorial_visto';
+  try {
+    if (localStorage.getItem(CLAVE) === '1') return;
+    localStorage.setItem(CLAVE, '1'); // se marca antes para que salga una sola vez
+  } catch (_) {
+    return; // sin localStorage no lo mostramos, para no repetirlo en cada visita
+  }
+  // Pequeña pausa para que el panel se pinte antes de mostrar el aviso.
+  setTimeout(() => { if (sesionActual) alert(MSG_TUTORIAL); }, 400);
 }
 
 let timerVencimiento = null;
@@ -725,8 +813,14 @@ function actualizarBannerVencimiento() {
 
 function esPermitida(q, fase, asignatura) {
   if (!q || q.fase !== Number(fase)) return false;
-  if (q.asignatura === 'General') return true;
-  return claveAsignatura(q.asignatura) === claveAsignatura(asignatura);
+  
+  const asigQ = String(q.asignatura || '').trim();
+  if (asigQ === 'General') return true;
+  
+  const claveQ = claveAsignatura(asigQ);
+  const claveUsuario = claveAsignatura(asignatura);
+  
+  return claveQ === claveUsuario;
 }
 
 function armarIntegral(banco, fase, asignatura, nEsp, nPed, nDig) {
@@ -737,10 +831,11 @@ function armarIntegral(banco, fase, asignatura, nEsp, nPed, nDig) {
   const espP = pool.filter(q => q.categoria === 'ESP');
 
   if (espP.length < nEsp || pedP.length < nPed || digP.length < nDig) {
-    throw new Error(
+    logDev(
       `Faltan preguntas válidas para armar el examen (disponibles/necesarias → ` +
       `asignatura: ${espP.length}/${nEsp}, Pedagógicos: ${pedP.length}/${nPed}, Digitales: ${digP.length}/${nDig}).`
     );
+    throw new ErrorAmigable('Todavía no hay suficientes preguntas para armar este examen con tu asignatura. Escríbenos por WhatsApp y lo resolvemos.');
   }
 
   return barajar([
@@ -775,6 +870,20 @@ async function iniciarExamen(tipo) {
     }
 
     sesionActual = aplicarDatosServidor(sesionActual, data);
+
+    // [LÍMITE DE INTENTOS] El simulacro oficial se puede hacer máximo 3 veces por licencia.
+    // El diagnóstico no tiene límite. Se consulta ANTES de cargar el banco de preguntas.
+    if (esSim) {
+      const { data: puedeSimular, error: errLimite } = await obtenerSupabase().rpc('verificar_limite_simulacros', {
+        p_codigo: sesionActual.codigo
+      });
+      if (errLimite) throw errLimite; // si no se puede verificar, no se inicia (falla cerrada)
+      if (puedeSimular !== true) {
+        alert(MSG_LIMITE_SIMULACROS);
+        return;
+      }
+    }
+
     const fase = sesionActual.fase;
     const asig = sesionActual.asignatura;
     const banco = await cargarBanco(fase, asig);
@@ -782,14 +891,13 @@ async function iniciarExamen(tipo) {
     const preguntas = armarIntegral(banco, fase, asig, cfg.esp, cfg.ped, cfg.dig);
 
     if (preguntas.length !== totalEsperado) {
-      throw new Error(`El examen debe tener ${totalEsperado} preguntas y se armaron ${preguntas.length}.`);
+      logDev(`El examen debe tener ${totalEsperado} preguntas y se armaron ${preguntas.length}.`);
+      throw new ErrorAmigable('No pudimos preparar tu examen. Intenta de nuevo en unos minutos.');
     }
     if (!preguntas.every(q => esPermitida(q, fase, asig))) {
-      throw new Error('Examen bloqueado: contiene preguntas no permitidas.');
+      logDev('Examen bloqueado: contiene preguntas no permitidas.');
+      throw new ErrorAmigable('No pudimos preparar tu examen. Intenta de nuevo en unos minutos.');
     }
-
-    console.info(`[ApruebaDocente] ${tipo}: ${preguntas.length} preguntas ` +
-      `(${cfg.esp} asignatura + ${cfg.ped} pedagógicos + ${cfg.dig} digitales)`);
 
     examenActual = {
       tipo: tipo,
@@ -799,8 +907,27 @@ async function iniciarExamen(tipo) {
       feedback: {},
       incidencias: 0,
       tiempoRestante: esSim ? 165 * 60 : 0,
-      timer: null
+      timer: null,
+      inicioMono: performance.now()
     };
+
+         // [MODO VIGILADO]
+    if (esSim) {
+      const camaraOk = await iniciarCamaraVigilancia();
+      if (!camaraOk) {
+        examenActual = null;
+        throw new Error('El simulacro requiere acceso a cámara y micrófono. Actívalos en tu navegador e intenta de nuevo.');
+      }
+    }
+    
+    const fsOk = await entrarPantallaCompleta();
+    if (!fsOk) {
+      apagarCamaraVigilancia();
+      examenActual = null;
+      throw new ErrorAmigable('Debes permitir la pantalla completa para iniciar el examen.');
+    }
+    
+    activarAntiTrampas();
 
     mostrarPantalla('pantalla-examen');
     renderExamenUI();
@@ -812,10 +939,13 @@ async function iniciarExamen(tipo) {
       $('timer').classList.add('hidden');
     }
   } catch (e) {
-    console.error(e);
-    aviso.textContent = e.message || 'No se pudo iniciar el examen.';
+    logDev(e);
+    aviso.textContent = mensajeAmigable(e);
     aviso.classList.remove('hidden');
   } finally {
-    if (sesionActual && sesionActual.fase === 1) btn.disabled = false;
+    if (sesionActual && sesionActual.fase === 1) {
+      if (!btn.dataset.bloqueadoFase) btn.disabled = false;
+    }
+    if (!examenActual && typeof resetCompromisoPanel === 'function') resetCompromisoPanel();
   }
 }

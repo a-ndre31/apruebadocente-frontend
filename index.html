@@ -42,7 +42,6 @@
     .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
     .lg { width: 32px; height: 32px; flex: none; }
 
-    /* Franja tricolor Ecuador */
     .franja-ecuador {
       height: 5px;
       background: linear-gradient(to right, #FFDD00 0%, #FFDD00 33.33%, #034EA2 33.33%, #034EA2 66.66%, #ED1C24 66.66%, #ED1C24 100%);
@@ -51,7 +50,6 @@
       display: block;
     }
 
-    /* Botones Globales */
     .btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 8px;
       padding: 10px 18px; border: 0; border-radius: 8px; font: 600 14px Inter, sans-serif;
@@ -77,7 +75,6 @@
     .btn-lg { padding: 14px 26px; font-size: 16px; border-radius: 12px; }
     .btn-block { width: 100%; }
 
-    /* ===== LANDING PAGE DETALLADA ===== */
     .ln-nav {
       position: sticky; top: 0; z-index: 20;
       background: rgba(11, 16, 32, 0.92);
@@ -168,7 +165,6 @@
     .wa-f { position: fixed; right: 20px; bottom: 20px; z-index: 30; width: 56px; height: 56px; border-radius: 50%; background: #25d366; display: grid; place-items: center; font-size: 28px; text-decoration: none; box-shadow: 0 8px 24px rgba(37,211,102,.45); transition: transform .2s; }
     .wa-f:hover { transform: scale(1.08); }
 
-    /* ===== LOGIN ===== */
     #pantalla-login { background: radial-gradient(700px 400px at 10% 0,#c7d2fe,transparent 60%), linear-gradient(135deg,#312e81,#4f46e5); align-items: center; justify-content: center; padding: 24px; }
     #pantalla-login.activa { display: flex; }
     .login-container { background: var(--w); border-radius: 24px; box-shadow: 0 30px 80px rgba(0,0,0,.35); padding: 48px 32px; max-width: 420px; width: 100%; text-align: center; }
@@ -179,7 +175,6 @@
     .login-form input:focus, .login-form select:focus { border-color: var(--p); outline: none; box-shadow: 0 0 0 4px #e0e7ff; }
     .alerta-err { color: var(--er); font-size: 13px; margin-top: 10px; text-align: center; }
 
-    /* ===== PANEL DOCENTE ===== */
     .topbar { background: var(--w); border-bottom: 1px solid var(--ln); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
     .panel-main { max-width: 1000px; margin: 0 auto; padding: 32px 24px; }
     .info-usuario { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
@@ -191,11 +186,9 @@
     .accion-card { border: 2px solid var(--ln); border-radius: 16px; padding: 20px; text-align: center; background: #fff; transition: all .2s; }
     .accion-card:hover { border-color: var(--p); box-shadow: 0 4px 14px rgba(79,70,229,.1); }
 
-    /* ===== PANTALLA EXAMEN Y RESULTADOS ===== */
     .examen-card { background: #fff; border-radius: 16px; border: 1px solid var(--ln); padding: 24px; box-shadow: var(--shadow); margin-bottom: 24px; }
     .navegador-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 
-    /* ===== PANTALLA ADMINISTRACIÓN REDISEÑADA ===== */
     #pantalla-admin .wrap { max-width: 1240px; }
     #pantalla-admin .app-pad { padding: 24px 0; }
     #pantalla-admin .header-admin {
@@ -270,7 +263,6 @@
     .usuario-codigo { font-family: monospace; font-size: 1.1rem; font-weight: 700; letter-spacing: 0.04em; margin: 0.4rem 0; }
     .hidden { display: none !important; }
 
-    /* ===== ESTILOS ADICIONALES ===== */
     :focus-visible { outline: 3px solid var(--p); outline-offset: 2px; }
     .ln-nav :focus-visible, .hero :focus-visible, .fin :focus-visible, .ft :focus-visible { outline-color: #fcd34d; }
 
@@ -295,7 +287,6 @@
     .legal-cuerpo h3 { font-size: 14px; margin: 14px 0 4px; }
     .legal-cuerpo p { font-size: 13px; color: var(--mu); }
 
-    /* [NUEVO · TAREA 2] Vigencia: banners del panel docente y chips de estado del admin */
     .banner-aviso  { background:#fef3c7; color:#92400e; border:1px solid #fde68a; }
     .banner-peligro{ background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
     .chip-vencida   { color:var(--er); font-weight:700; }
@@ -303,7 +294,6 @@
     .chip-ok        { color:var(--ok); font-weight:700; }
     .chip-demo      { color:#1d4ed8; font-weight:700; }
 
-    /* [NUEVO · TAREA 2] Impresión del reporte de avance (Centro de Administración) */
     #area-impresion { display: none; }
     @media print {
       body * { visibility: hidden; }
@@ -315,7 +305,6 @@
       @page { margin: 1.5cm; }
     }
 
-    /* [NUEVO · TAREA 2] Bloque de consentimiento en el login */
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
     .consent-block { border: 0; margin: 4px 0 16px; padding: 0; min-width: 0; }
     .consent-item { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
@@ -327,7 +316,6 @@
     .consent-block a:focus-visible { outline: 3px solid #c7d2fe; outline-offset: 2px; border-radius: 4px; }
     .consent-ok { font-size: 12px; font-weight: 600; color: var(--okd); margin: 2px 0 0; }
 
-    /* [NUEVO · TAREA 4] Banner de cookies informativas (no modal) */
     .cookie-banner { position: fixed; left: 16px; right: 96px; bottom: 16px; z-index: 20; display: flex; align-items: center; gap: 16px; background: var(--w); color: var(--tx); border: 1px solid var(--ln); border-radius: 16px; box-shadow: 0 12px 40px rgba(15,23,42,.18); padding: 14px 18px; font-size: 13px; opacity: 0; transform: translateY(16px); transition: opacity .3s ease, transform .3s ease; }
     .cookie-banner[hidden] { display: none; }
     .cookie-banner.visible { opacity: 1; transform: none; }
@@ -339,6 +327,8 @@
       .cookie-actions { justify-content: flex-end; }
       body.banner-visible .wa-f { bottom: calc(var(--banner-h, 140px) + 12px); }
     }
+
+    #compromiso-box { transition: all .2s ease; }
 
     @media (max-width: 850px) {
       .hero .wrap { grid-template-columns: 1fr; }
@@ -353,12 +343,11 @@
 </head>
 <body>
 
-  <!-- [NUEVO] Advertencia para móviles -->
   <div id="mobile-warning" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:99999; background:#0f172a; color:#fff; align-items:center; justify-content:center; text-align:center; padding:24px; box-sizing:border-box;" role="dialog" aria-modal="true" aria-labelledby="mobile-warning-title">
     <div style="max-width:420px;">
       <div style="font-size:56px; margin-bottom:16px;">💻</div>
       <h2 id="mobile-warning-title" style="font-size:24px; font-weight:800; margin-bottom:12px; color:#fff;">Mejor experiencia en laptop o PC</h2>
-      <p style="font-size:16px; line-height:1.6; color:#cbd5e1; margin-bottom:28px;">Para que te concentres en tu simulacro y evites distracciones, te recomendamos usar ApruebaDocente desde una laptop o computadora. Si lo prefieres, también puedes continuar desde tu celular.</p>
+      <p style="font-size:16px; line-height:1.6; color:#cbd5e1; margin-bottom:28px;">Para que te concentres en tu examen y evites distracciones, te recomendamos usar ApruebaDocente desde una laptop o computadora. Si lo prefieres, también puedes continuar desde tu celular.</p>
       <button type="button" class="btn btn-cta btn-lg" onclick="document.getElementById('mobile-warning').style.display='none'">Entiendo, continuar en móvil</button>
     </div>
   </div>
@@ -383,7 +372,6 @@
           <a href="#precios">Precio</a>
           <a href="#faq">Preguntas</a>
           <a href="#soporte">Soporte</a>
-          <button class="btn btn-outline-white" onclick="accederAdmin(event)">Soy administrador</button>
           <button class="btn btn-primary" onclick="mostrarPantalla('pantalla-login')">Ya tengo licencia</button>
         </div>
       </div>
@@ -398,16 +386,17 @@
           <div class="ctas">
             <a href="https://wa.me/593983941622?text=Hola,%20quiero%20informaci%C3%B3n%20sobre%20ApruebaDocente" target="_blank" class="btn btn-cta btn-lg">Quiero información por WhatsApp</a>
             <button class="btn btn-outline-white btn-lg" onclick="mostrarPantalla('pantalla-login')">Ingresar al simulador</button>
-          </div>
+         </div>
           <small>💬 Atención directa por WhatsApp · Acceso desde cualquier dispositivo</small>
         </div>
         <div class="mock" aria-hidden="true">
           <div class="dots"><i></i><i></i><i></i><span>Vista previa del simulador</span></div>
           <div class="top"><span>Simulacro · Pregunta 14 de 20</span><span class="tm">⏱ 118:42</span></div>
           <div class="q">La Zona de Desarrollo Próximo de Vygotsky se define como:</div>
-          <div class="o">A. El nivel que el estudiante ya domina solo.</div>
-          <div class="o s">B. La distancia entre lo que hace solo y con ayuda. ✓</div>
+          <div class="o">A. El nivel que el estudiante ya domina por sí solo.</div>
+          <div class="o s">B. La distancia entre lo que hace solo y lo que logra con ayuda. ✓</div>
           <div class="o">C. El espacio físico donde se realiza la clase.</div>
+          <div class="o">D. La etapa en la que el estudiante no requiere mediación.</div>
           <div class="pg"><i></i></div>
           <div class="chip">✓ Argumento explicado en cada pregunta</div>
         </div>
@@ -529,7 +518,7 @@
         <div class="cols">
           <div><div class="brand-logo"><svg class="lg"><use href="#logo"/></svg>ApruebaDocente</div><p>Plataforma de preparación para la EVDO 2026-2027.<br>Ecuador</p></div>
           <div><h4>Contacto</h4><a href="https://wa.me/593983941622" target="_blank">WhatsApp: +593 98 394 1622</a></div>
-          <div><h4>Acceso</h4><a href="#" onclick="mostrarPantalla('pantalla-login'); return false;">Ingresar</a><a href="#" onclick="accederAdmin(event)">Soy administrador</a></div>
+          <div><h4>Acceso</h4><a href="#" onclick="mostrarPantalla('pantalla-login'); return false;">Ingresar</a></div>
           <div><h4>Legal</h4><a href="#" onclick="abrirLegal('terminos'); return false;">Términos y condiciones</a><a href="#" onclick="abrirLegal('privacidad'); return false;">Política de privacidad</a><p style="margin-top:8px">© 2026 ApruebaDocente.<br>Plataforma independiente.</p></div>
         </div>
         <div class="cp">ApruebaDocente no está afiliado ni representa al INEVAL o Ministerio de Educación.</div>
@@ -538,7 +527,6 @@
 
     <a class="wa-f" href="https://wa.me/593983941622?text=Hola,%20quiero%20informaci%C3%B3n" target="_blank" aria-label="WhatsApp">💬</a>
 
-    <!-- [NUEVO · TAREA 4] Banner de cookies informativas -->
     <div id="cookie-banner" class="cookie-banner" role="region" aria-label="Aviso de cookies" aria-describedby="cookie-banner-texto" hidden>
       <p id="cookie-banner-texto">Usamos solo cookies y almacenamiento técnico necesarios para el funcionamiento del sitio (sesión y preferencias).</p>
       <div class="cookie-actions">
@@ -558,7 +546,6 @@
         <label for="input-licencia">Usuario / Licencia</label>
         <input type="text" id="input-licencia" placeholder="ej. maria.cevallos-ueqa" autocomplete="username">
         
-        <!-- Bloque dinámico para licencias EVDO -->
         <div id="bloque-evdo-config" class="hidden" style="margin-bottom: 12px;">
           <label for="login-evdo-fase">Fase asignada</label>
           <select id="login-evdo-fase" onchange="actualizarAsignaturasEvdoLogin()">
@@ -575,7 +562,6 @@
           </select>
         </div>
 
-        <!-- [NUEVO · TAREA 2] Consentimiento informado obligatorio -->
         <fieldset class="consent-block">
           <legend class="sr-only">Consentimiento informado</legend>
           <div class="consent-item">
@@ -590,9 +576,9 @@
         </fieldset>
         <button class="btn btn-primary btn-block" id="btn-entrar" disabled onclick="iniciarSesion()">Ingresar al simulador</button>
         <div id="login-error" class="alerta-err hidden"></div>
+        <a href="https://wa.me/593983941622?text=Hola,%20quiero%20comprar%20una%20licencia" target="_blank" rel="noopener" class="btn btn-cta btn-block btn-lg" style="margin-top:16px;">🛒 Comprar licencia por WhatsApp</a>
       </div>
       <div style="margin-top:20px; font-size:13px;">
-        <a href="#" onclick="accederAdmin(event)" style="color:var(--mu); text-decoration:none;">Acceso administrador</a><br><br>
         <a href="#" onclick="mostrarPantalla('pantalla-inicio'); return false;" style="color:var(--p); text-decoration:none;">← Volver a la página principal</a>
       </div>
     </div>
@@ -610,9 +596,30 @@
     </header>
     <main class="panel-main">
       <div class="info-usuario" id="resumen-intentos"></div>
-      <!-- [NUEVO · TAREA 2] Aviso de vencimiento de la licencia -->
       <div id="panel-vencimiento" class="hidden" role="status" aria-live="polite"
            style="margin-bottom:16px; padding:12px 16px; border-radius:10px; font-size:14px; font-weight:600;"></div>
+
+      <!-- Aviso para usuarios de iPhone (se muestra desde app.js) -->
+      <div id="aviso-iphone" class="banner-aviso hidden" role="status"
+           style="margin-bottom:16px; padding:12px 16px; border-radius:10px; font-size:14px; font-weight:600;">
+        📱 Estás usando un iPhone. Para ver mejor las preguntas y los botones, te recomendamos girar tu teléfono en posición horizontal. También puedes usar una laptop o computadora.
+      </div>
+
+      <!-- Compromiso obligatorio antes de iniciar -->
+      <div id="compromiso-box" style="background:#fef2f2; border:2px solid #fecaca; border-radius:12px; padding:14px 16px; margin-bottom:16px;">
+        <label for="chk-compromiso" style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; font-size:14px; color:#7f1d1d; font-weight:600; line-height:1.45;">
+          <input type="checkbox" id="chk-compromiso" onchange="actualizarBotonInicioExamen()"
+                 style="width:18px; height:18px; flex:none; margin-top:2px; accent-color:#dc2626; cursor:pointer;">
+          <span>
+            Acepto realizar el examen en <strong>modo vigilado</strong>:
+            se activará pantalla completa en <strong>ambos exámenes</strong> y, solo en el <strong>Simulacro Oficial</strong>,
+            también cámara y micrófono (sin grabar ni subir nada). Se anulará el intento con 0 puntos si salgo de la
+            pestaña/ventana, intento capturar la pantalla o uso atajos de copia.
+            No podré finalizar antes de 5 minutos. Me comprometo a no usar apuntes ni ayuda externa.
+          </span>
+        </label>
+      </div>
+
       <div style="background:#fff; border-radius:16px; padding:24px; border:1px solid var(--ln); box-shadow:var(--shadow)">
         <h2 style="font-size:18px; margin-bottom:6px;">Tu espacio de preparación</h2>
         <p style="color:var(--mu); font-size:14px; margin-bottom:20px;">Tu examen integra preguntas de Digitales, Pedagógicos y tu especialidad.</p>
@@ -622,12 +629,12 @@
         <div class="acciones-examen">
           <div class="accion-card">
             <h3>Evaluación Diagnóstica</h3>
-            <p style="font-size:13px; color:var(--mu); margin:8px 0 16px"></p>
+            <p style="font-size:13px; color:var(--mu); margin:8px 0 16px">Mide tu nivel con explicación inmediata</p>
             <button class="btn btn-primary btn-block" id="btn-iniciar-diag" onclick="iniciarExamen('diagnostico')">Comenzar diagnóstico</button>
           </div>
           <div class="accion-card">
             <h3>Simulacro Oficial</h3>
-            <p style="font-size:13px; color:var(--mu); margin:8px 0 16px">120 min</p>
+            <p style="font-size:13px; color:var(--mu); margin:8px 0 16px">Simula el examen real con tiempo y cámara</p>
             <button class="btn btn-success btn-block" id="btn-iniciar-sim" onclick="iniciarExamen('simulacro')">Iniciar simulacro</button>
           </div>
         </div>
@@ -678,6 +685,10 @@
       <div class="examen-card">
         <h3 style="margin-bottom:16px;">Revisión de respuestas</h3>
         <div id="resultado-detalle"></div>
+      </div>
+      <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-bottom:24px;">
+        <button type="button" class="btn btn-primary btn-lg" onclick="mostrarPantalla('pantalla-panel')">Volver al panel</button>
+        <button type="button" class="btn btn-outline btn-lg" onclick="mostrarPantalla('pantalla-historial')">Ver mi historial</button>
       </div>
     </main>
   </div>
@@ -734,7 +745,6 @@
         </nav>
 
         <main class="admin-content">
-          <!-- SECCIÓN: Resumen general -->
           <section id="admin-resumen" class="admin-seccion card-admin activa">
             <div class="admin-welcome">
               <div class="welcome-label">Panel de control</div>
@@ -751,7 +761,6 @@
             </div>
           </section>
 
-          <!-- SECCIÓN: Registrar docente -->
           <section id="admin-crear" class="admin-seccion card-admin">
             <div class="section-heading">
               <div><span class="section-kicker">ACCESOS</span><h2>Registrar nuevo docente</h2><p>Genera una licencia de acceso vinculada a la fase y asignatura del docente.</p></div>
@@ -782,9 +791,8 @@
               <strong id="codigo-generado-label">Usuario creado:</strong>
               <div class="usuario-codigo" id="usuario-codigo"></div>
               <div id="nota-temporal" class="hidden" style="font-size:0.85rem; color:var(--mu); margin-bottom:0.5rem;">
-                ⚠ Usuario temporal de prueba. Prefijo “prueba-”.
+                ⚠ Usuario temporal de prueba. Prefijo "prueba-".
               </div>
-              <!-- [NUEVO · TAREA 2] Vencimiento de la licencia recién creada -->
               <div id="codigo-vence" class="hidden" style="font-size:0.9rem; font-weight:600; margin-bottom:0.5rem;"></div>
               <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.6rem;">
                 <button class="btn btn-secondary" onclick="copiarUsuario()">Copiar</button>
@@ -794,7 +802,6 @@
             <div id="admin-crear-alerta" class="alerta-err hidden" style="margin-top:0.9rem;"></div>
           </section>
 
-          <!-- SECCIÓN: Estadísticas -->
           <section id="admin-stats" class="admin-seccion card-admin">
             <div class="section-heading">
               <div><span class="section-kicker">INDICADORES</span><h2>Analítica y estadísticas</h2><p>Consulta el comportamiento general de las evaluaciones registradas.</p></div>
@@ -810,18 +817,15 @@
             </div>
           </section>
 
-          <!-- SECCIÓN: Docentes Registrados -->
           <section id="admin-usuarios" class="admin-seccion card-admin">
             <div class="section-heading">
               <div><span class="section-kicker">DIRECTORIO</span><h2>Docentes registrados</h2><p>Listado de accesos, fase asignada y actividad de cada docente.</p></div>
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start;">
-            <!-- [NUEVO] Exportar docentes a CSV/Excel -->
             <button class="btn btn-success no-print" id="btn-admin-exportar-excel"
                     onclick="exportarUsuariosExcel()"
                     aria-label="Exportar docentes registrados a Excel">
               📥 Exportar a Excel
             </button>
-            <!-- [NUEVO · TAREA 2] Borrado total del historial (peligroso) -->
             <button class="btn btn-danger no-print" id="btn-admin-borrar-historial"
                     onclick="adminBorrarTodoHistorial()"
                     aria-label="Borrar todo el historial de intentos">
@@ -830,11 +834,10 @@
             </div>
             </div>
             <div class="table-wrap">
-              <table class="tabla"><thead><tr><!-- [NUEVO · TAREA 2] columnas de vigencia --><th>Usuario</th><th>Fase</th><th>Asignatura</th><th>Vence el</th><th>Estado</th><th>Intentos</th><th>Consentimiento</th><th>Acción</th></tr></thead><tbody id="admin-usuarios-body"></tbody></table>
+              <table class="tabla"><thead><tr><th>Usuario</th><th>Fase</th><th>Asignatura</th><th>Vence el</th><th>Estado</th><th>Intentos</th><th>Consentimiento</th><th>Acción</th></tr></thead><tbody id="admin-usuarios-body"></tbody></table>
             </div>
           </section>
 
-          <!-- SECCIÓN: Resultados Recientes -->
           <section id="admin-resultados" class="admin-seccion card-admin">
             <div class="section-heading">
               <div><span class="section-kicker">ACTIVIDAD</span><h2>Resultados recientes</h2><p>Revisa los puntajes y el estado de las evaluaciones más recientes.</p></div>
@@ -844,7 +847,6 @@
             </div>
           </section>
 
-          <!-- SECCIÓN: Análisis de Preguntas -->
           <section id="admin-fallos" class="admin-seccion card-admin">
             <div class="section-heading">
               <div><span class="section-kicker">MEJORA</span><h2>Análisis de preguntas</h2><p>Identifica las preguntas con mayor frecuencia de respuestas incorrectas.</p></div>
@@ -882,16 +884,13 @@
     </div>
   </dialog>
 
-  <!-- [NUEVO · TAREA 2] Área oculta donde se arma el reporte de avance para imprimir -->
   <div id="area-impresion"></div>
 
-  <!-- Importaciones al final del cuerpo HTML -->
   <script src="config.js"></script>
-  <script src="legales.js"></script>   <!-- [NUEVO · TAREA 2] faltaba: sin él abrirLegal() falla (LEGAL vive aquí) -->
-  <script src="app.js?v=2"></script>
-  <script src="examen.js"></script>
+  <script src="legales.js"></script>
+  <script src="app.js?v=6"></script>
+  <script src="examen.js?v=6"></script>
   <script src="admin.js"></script>
-  <!-- [NUEVO] Detección de móvil -->
   <script>
     if (window.innerWidth <= 768) {
       var mw = document.getElementById('mobile-warning');
