@@ -25,7 +25,7 @@ function renderExamenUI() {
   const fb = examenActual.tipo === 'diagnostico' ? examenActual.feedback[q.id] : null;
   const respondidaDiag = !!(fb && fb.listo);
 
-  LETRAS.forEach(l => {
+ LETRAS.forEach(l => {
     const div = document.createElement('div');
     div.className = 'o';
     if (seleccionada === l) div.classList.add('s');
@@ -35,7 +35,14 @@ function renderExamenUI() {
       else if (seleccionada === l) div.classList.add('x');
     }
 
-    div.innerHTML = `<strong>${l}.</strong> ${esc(q.opciones[l])}`;
+    // 👇 NUEVO: Círculo de selección visual 👇
+    const colorCirculo = seleccionada === l ? 'var(--p)' : '#cbd5e1';
+    const colorFondo = seleccionada === l ? 'var(--p)' : 'transparent';
+    const circulo = `<span style="display:inline-block; width:18px; height:18px; border-radius:50%; border:2px solid ${colorCirculo}; background:${colorFondo}; margin-right:12px; vertical-align:middle; flex-shrink:0;"></span>`;
+    
+    div.innerHTML = `<div style="display:flex; align-items:center;">${circulo}<strong style="margin-right:6px;">${l}.</strong> <span>${esc(q.opciones[l])}</span></div>`;
+    // 👆 FIN DEL NUEVO BLOQUE 👆
+
     div.onclick = () => seleccionarRespuestaExamen(q.id, l);
     contOp.appendChild(div);
   });
